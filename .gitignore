@@ -40,3 +40,6 @@
 
 # binary file
 demo/demo
+
+# VS code files
+.vscode
