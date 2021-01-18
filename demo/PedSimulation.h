@@ -19,7 +19,7 @@ class PedSimulation : public QObject {
   Q_OBJECT
 
  public:
-  PedSimulation(Ped::Model &model, MainWindow &window);
+  PedSimulation(Ped::Model& model, MainWindow& window);
   PedSimulation() = delete;
   ~PedSimulation() {}
 
@@ -34,8 +34,8 @@ class PedSimulation : public QObject {
   void simulateOneStep();
 
  private:
-  Ped::Model &model;
-  MainWindow &window;
+  Ped::Model& model;
+  MainWindow& window;
   QTimer movetimer;
   int maxSimulationSteps;
   int tickCounter;

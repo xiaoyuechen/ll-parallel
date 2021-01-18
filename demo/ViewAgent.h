@@ -13,16 +13,16 @@
 
 class ViewAgent {
  public:
-  ViewAgent(Ped::Tagent *agent, QGraphicsScene *scene);
+  ViewAgent(Ped::Tagent* agent, QGraphicsScene* scene);
   void paint(QColor color);
   const std::pair<int, int> getPosition();
 
  private:
-  const Ped::Tagent *agent;
+  const Ped::Tagent* agent;
 
   // The rectangle on the GUI representing this agent
-  QGraphicsRectItem *rect;
-  QGraphicsPixmapItem *bgt_icon;
+  QGraphicsRectItem* rect;
+  QGraphicsPixmapItem* bgt_icon;
 };
 
 #endif

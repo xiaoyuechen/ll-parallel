@@ -13,7 +13,7 @@
 
 using namespace std;
 
-PedSimulation::PedSimulation(Ped::Model &model_, MainWindow &window_)
+PedSimulation::PedSimulation(Ped::Model& model_, MainWindow& window_)
     : model(model_), window(window_), maxSimulationSteps(-1) {
   tickCounter = 0;
 }

@@ -23,13 +23,13 @@ class ParseScenario : public QObject {
   Q_OBJECT
 
  public:
-  ParseScenario(QObject *qobj) : QObject(qobj){};
+  ParseScenario(QObject* qobj) : QObject(qobj){};
   ParseScenario(QString file);
   ~ParseScenario() {}
 
   // returns the collection of agents defined by this scenario
-  vector<Ped::Tagent *> getAgents() const;
-  std::vector<Ped::Twaypoint *> getWaypoints();
+  vector<Ped::Tagent*> getAgents() const;
+  std::vector<Ped::Twaypoint*> getWaypoints();
  private slots:
   void processXmlLine(QByteArray data);
   // contains all defined waypoints
@@ -38,15 +38,15 @@ class ParseScenario : public QObject {
   QXmlStreamReader xmlReader;
 
   // final collection of all created agents
-  vector<Ped::Tagent *> agents;
+  vector<Ped::Tagent*> agents;
 
   // temporary collection of agents used to
   // keep track of all agents that are generated
   // within the current opened agents xml tag
-  vector<Ped::Tagent *> tempAgents;
+  vector<Ped::Tagent*> tempAgents;
 
   // contains all defined waypoints
-  map<QString, Ped::Twaypoint *> waypoints;
+  map<QString, Ped::Twaypoint*> waypoints;
 
   // decides what to do on a new xml tag (tags: agent, waypoint, addwaypoint)
   void handleXmlStartElement();
@@ -61,10 +61,10 @@ class ParseScenario : public QObject {
   void createAgents();
 
   // add (by ID-)defined waypoint to current agents
-  void addWaypointToCurrentAgents(QString &id);
+  void addWaypointToCurrentAgents(QString& id);
 
-  QString readString(const QString &tag);
-  double readDouble(const QString &tag);
+  QString readString(const QString& tag);
+  double readDouble(const QString& tag);
 };
 
 #endif

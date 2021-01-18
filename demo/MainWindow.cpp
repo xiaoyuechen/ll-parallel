@@ -7,7 +7,7 @@
 #include <QtGui>
 #include <iostream>
 
-MainWindow::MainWindow(const Ped::Model &pedModel) : model(pedModel) {
+MainWindow::MainWindow(const Ped::Model& pedModel) : model(pedModel) {
   // The Window
   graphicsView = new QGraphicsView();
 
@@ -32,9 +32,9 @@ MainWindow::MainWindow(const Ped::Model &pedModel) : model(pedModel) {
   }
 
   // Create viewAgents with references to the position of the model counterparts
-  const std::vector<Ped::Tagent *> &agents = model.getAgents();
+  const std::vector<Ped::Tagent*>& agents = model.getAgents();
 
-  std::vector<Ped::Tagent *>::const_iterator it;
+  std::vector<Ped::Tagent*>::const_iterator it;
 
   for (it = agents.begin(); it != agents.end(); it++) {
     viewAgents.push_back(new ViewAgent(*it, scene));
@@ -57,8 +57,8 @@ void MainWindow::paint() {
   pixmap->setPixmap(QPixmap::fromImage(image));
 
   // Paint all agents: green, if the only agent on that position, otherwise red
-  std::set<std::tuple<int, int> > positionsTaken;
-  std::vector<ViewAgent *>::iterator it;
+  std::set<std::tuple<int, int>> positionsTaken;
+  std::vector<ViewAgent*>::iterator it;
   for (it = viewAgents.begin(); it != viewAgents.end(); it++) {
     size_t tupleSizeBeforeInsert = positionsTaken.size();
     positionsTaken.insert((*it)->getPosition());
@@ -78,5 +78,5 @@ void MainWindow::paint() {
 int MainWindow::cellToPixel(int val) { return val * cellsizePixel; }
 MainWindow::~MainWindow() {
   for_each(viewAgents.begin(), viewAgents.end(),
-           [](ViewAgent *agent) { delete agent; });
+           [](ViewAgent* agent) { delete agent; });
 }

@@ -14,14 +14,14 @@ using namespace std;
 
 // Sets up the heatmap
 void Ped::Model::setupHeatmapSeq() {
-  int *hm = (int *)calloc(SIZE * SIZE, sizeof(int));
-  int *shm = (int *)malloc(SCALED_SIZE * SCALED_SIZE * sizeof(int));
-  int *bhm = (int *)malloc(SCALED_SIZE * SCALED_SIZE * sizeof(int));
+  int* hm = (int*)calloc(SIZE * SIZE, sizeof(int));
+  int* shm = (int*)malloc(SCALED_SIZE * SCALED_SIZE * sizeof(int));
+  int* bhm = (int*)malloc(SCALED_SIZE * SCALED_SIZE * sizeof(int));
 
-  heatmap = (int **)malloc(SIZE * sizeof(int *));
+  heatmap = (int**)malloc(SIZE * sizeof(int*));
 
-  scaled_heatmap = (int **)malloc(SCALED_SIZE * sizeof(int *));
-  blurred_heatmap = (int **)malloc(SCALED_SIZE * sizeof(int *));
+  scaled_heatmap = (int**)malloc(SCALED_SIZE * sizeof(int*));
+  blurred_heatmap = (int**)malloc(SCALED_SIZE * sizeof(int*));
 
   for (int i = 0; i < SIZE; i++) {
     heatmap[i] = hm + SIZE * i;
@@ -43,7 +43,7 @@ void Ped::Model::updateHeatmapSeq() {
 
   // Count how many agents want to go to each location
   for (int i = 0; i < agents.size(); i++) {
-    Ped::Tagent *agent = agents[i];
+    Ped::Tagent* agent = agents[i];
     int x = agent->getDesiredX();
     int y = agent->getDesiredY();
 

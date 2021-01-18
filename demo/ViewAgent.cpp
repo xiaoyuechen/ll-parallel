@@ -12,7 +12,7 @@
 
 #include "MainWindow.h"
 
-/* XPM */ static const char *bgt[] = {
+/* XPM */ static const char* bgt[] = {
     "33 18 250 2 ", "   c None", ".  c #010101", "X  c #030303", "o  c #030404",
     "O  c #030405", "+  c #020406", "@  c #040404", "#  c #040405",
     "$  c #050505", "%  c #070504", "&  c #050607", "*  c #060606",
@@ -96,7 +96,7 @@
     "  4 v P [ L B x 1 &                                               ",
     "    8 < , # +                                                     "};
 
-ViewAgent::ViewAgent(Ped::Tagent *agent, QGraphicsScene *scene) : agent(agent) {
+ViewAgent::ViewAgent(Ped::Tagent* agent, QGraphicsScene* scene) : agent(agent) {
   QBrush greenBrush(Qt::green);
   QPen outlinePen(Qt::black);
   outlinePen.setWidth(2);

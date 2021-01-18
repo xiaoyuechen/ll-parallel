@@ -19,19 +19,19 @@
 #include "ped_model.h"
 #include "ped_waypoint.h"
 
-void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
-                       std::vector<Twaypoint *> destinationsInScenario,
+void Ped::Model::setup(std::vector<Ped::Tagent*> agentsInScenario,
+                       std::vector<Twaypoint*> destinationsInScenario,
                        IMPLEMENTATION implementation) {
   // Convenience test: does CUDA work on this machine?
   cuda_test();
 
   // Set
-  agents = std::vector<Ped::Tagent *>(agentsInScenario.begin(),
-                                      agentsInScenario.end());
+  agents = std::vector<Ped::Tagent*>(agentsInScenario.begin(),
+                                     agentsInScenario.end());
 
   // Set up destinations
-  destinations = std::vector<Ped::Twaypoint *>(destinationsInScenario.begin(),
-                                               destinationsInScenario.end());
+  destinations = std::vector<Ped::Twaypoint*>(destinationsInScenario.begin(),
+                                              destinationsInScenario.end());
 
   // Sets the chosen implemenation. Standard in the given code is SEQ
   this->implementation = implementation;
@@ -51,14 +51,14 @@ void Ped::Model::tick() {
 
 // Moves the agent to the next desired position. If already taken, it will
 // be moved to a location close to it.
-void Ped::Model::move(Ped::Tagent *agent) {
+void Ped::Model::move(Ped::Tagent* agent) {
   // Search for neighboring agents
-  set<const Ped::Tagent *> neighbors =
+  set<const Ped::Tagent*> neighbors =
       getNeighbors(agent->getX(), agent->getY(), 2);
 
   // Retrieve their positions
-  std::vector<std::pair<int, int> > takenPositions;
-  for (std::set<const Ped::Tagent *>::iterator neighborIt = neighbors.begin();
+  std::vector<std::pair<int, int>> takenPositions;
+  for (std::set<const Ped::Tagent*>::iterator neighborIt = neighbors.begin();
        neighborIt != neighbors.end(); ++neighborIt) {
     std::pair<int, int> position((*neighborIt)->getX(), (*neighborIt)->getY());
     takenPositions.push_back(position);
@@ -66,7 +66,7 @@ void Ped::Model::move(Ped::Tagent *agent) {
 
   // Compute the three alternative positions that would bring the agent
   // closer to his desiredPosition, starting with the desiredPosition itself
-  std::vector<std::pair<int, int> > prioritizedAlternatives;
+  std::vector<std::pair<int, int>> prioritizedAlternatives;
   std::pair<int, int> pDesired(agent->getDesiredX(), agent->getDesiredY());
   prioritizedAlternatives.push_back(pDesired);
 
@@ -88,7 +88,7 @@ void Ped::Model::move(Ped::Tagent *agent) {
   prioritizedAlternatives.push_back(p2);
 
   // Find the first empty alternative position
-  for (std::vector<pair<int, int> >::iterator it =
+  for (std::vector<pair<int, int>>::iterator it =
            prioritizedAlternatives.begin();
        it != prioritizedAlternatives.end(); ++it) {
     // If the current position is not yet taken by any neighbor
@@ -111,12 +111,11 @@ void Ped::Model::move(Ped::Tagent *agent) {
 /// \param   y the y coordinate
 /// \param   dist the distance around x/y that will be searched for agents
 /// (search field is a square in the current implementation)
-set<const Ped::Tagent *> Ped::Model::getNeighbors(int x, int y,
-                                                  int dist) const {
+set<const Ped::Tagent*> Ped::Model::getNeighbors(int x, int y, int dist) const {
   // create the output list
   // ( It would be better to include only the agents close by, but this
   // programmer is lazy.)
-  return set<const Ped::Tagent *>(agents.begin(), agents.end());
+  return set<const Ped::Tagent*>(agents.begin(), agents.end());
 }
 
 void Ped::Model::cleanup() {
@@ -125,7 +124,7 @@ void Ped::Model::cleanup() {
 
 Ped::Model::~Model() {
   std::for_each(agents.begin(), agents.end(),
-                [](Ped::Tagent *agent) { delete agent; });
+                [](Ped::Tagent* agent) { delete agent; });
   std::for_each(destinations.begin(), destinations.end(),
-                [](Ped::Twaypoint *destination) { delete destination; });
+                [](Ped::Twaypoint* destination) { delete destination; });
 }
