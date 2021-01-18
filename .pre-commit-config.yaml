@@ -5,5 +5,4 @@ repos:
   - repo: https://github.com/xiaoyuechen/pre-commit-hooks.git
     rev: v0.8
     hooks:
-    - id: cmake-format
-      args: [--in-place, --line-ending=auto]
+    - id: clang-format

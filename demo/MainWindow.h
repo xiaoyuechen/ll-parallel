@@ -1,39 +1,39 @@
 #ifndef _mainwindow_h_
 #define _mainwindow_h_
 
-#include <QMainWindow>
 #include <QGraphicsScene>
+#include <QMainWindow>
 #include <vector>
 
-#include "ped_model.h"
-#include "ped_agent.h"
 #include "ViewAgent.h"
+#include "ped_agent.h"
+#include "ped_model.h"
 class QGraphicsView;
 
-
 class MainWindow : public QMainWindow {
-public:
-	MainWindow() = delete;
-	MainWindow(const Ped::Model &model);
+ public:
+  MainWindow() = delete;
+  MainWindow(const Ped::Model &model);
 
-	// paint is called after each computational step
-	// to repaint the window
-	void paint();
+  // paint is called after each computational step
+  // to repaint the window
+  void paint();
 
-	static int cellToPixel(int val);
-	static const int cellsizePixel = 5;
-	~MainWindow();
-private:
-	QGraphicsView *graphicsView;
-	QGraphicsScene * scene;
+  static int cellToPixel(int val);
+  static const int cellsizePixel = 5;
+  ~MainWindow();
 
-	const Ped::Model &model;
+ private:
+  QGraphicsView *graphicsView;
+  QGraphicsScene *scene;
 
-	// the graphical representation of each agent
-	std::vector<ViewAgent*> viewAgents;
+  const Ped::Model &model;
 
-	// The pixelmap containing the heatmap image (Assignment 4)
-	QGraphicsPixmapItem *pixmap;
+  // the graphical representation of each agent
+  std::vector<ViewAgent *> viewAgents;
+
+  // The pixelmap containing the heatmap image (Assignment 4)
+  QGraphicsPixmapItem *pixmap;
 };
 
 #endif
