@@ -66,7 +66,7 @@ void Ped::Model::tickOmp() {
 void Ped::Model::tickThread() {
   static constexpr std::size_t kMaxThreads = 100;
   auto thread_array = std::array<std::thread, kMaxThreads>{};
-  auto hardware_threads = std::thread::hardware_concurrency();
+  auto hardware_threads = omp_get_max_threads();
   std::size_t thread_count =
       hardware_threads > kMaxThreads ? kMaxThreads : hardware_threads;
   std::size_t chunk = (agents.size() + thread_count - 1) / thread_count;
