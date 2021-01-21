@@ -11,10 +11,13 @@
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QTimer>
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <ctime>
 #include <iostream>
+#include <map>
+#include <string>
 #include <thread>
 
 #include "MainWindow.h"
@@ -30,6 +33,15 @@ int main(int argc, char* argv[]) {
   bool timing_mode = 0;
   int i = 1;
   QString scenefile = "scenario.xml";
+  auto impl = Ped::IMPLEMENTATION::SEQ;
+
+  auto impl_arg_map = std::map<std::string, Ped::IMPLEMENTATION>{};
+  impl_arg_map["seq"] = Ped::IMPLEMENTATION::SEQ;
+  impl_arg_map["omp"] = Ped::IMPLEMENTATION::OMP;
+  impl_arg_map["thread"] = Ped::IMPLEMENTATION::PTHREAD;
+  impl_arg_map["cuda"] = Ped::IMPLEMENTATION::CUDA;
+  impl_arg_map["vector"] = Ped::IMPLEMENTATION::VECTOR;
+  auto tick_mode_arg = std::string("tick-mode=");
 
   // Argument handling
   while (i < argc) {
@@ -41,6 +53,13 @@ int main(int argc, char* argv[]) {
         cout << "Usage: " << argv[0] << " [--help] [--timing-mode] [scenario]"
              << endl;
         return 0;
+      } else if (std::string(&argv[i][2], &argv[i][2] + tick_mode_arg.size()) ==
+                 tick_mode_arg) {
+        auto tick_mode = std::string(&argv[i][2 + tick_mode_arg.size()]);
+        std::transform(tick_mode.begin(), tick_mode.end(), tick_mode.begin(),
+                       ::tolower);
+        std::cout << "tick_mode: " << tick_mode << std::endl;
+        impl = impl_arg_map.at(tick_mode);
       } else {
         cerr << "Unrecognized command: \"" << argv[i] << "\". Ignoring ..."
              << endl;
@@ -58,7 +77,7 @@ int main(int argc, char* argv[]) {
     // Reading the scenario file and setting up the crowd simulation model
     Ped::Model model;
     ParseScenario parser(scenefile);
-    model.setup(parser.getAgents(), parser.getWaypoints(), Ped::SEQ);
+    model.setup(parser.getAgents(), parser.getWaypoints(), impl);
 
     // GUI related set ups
     QApplication app(argc, argv);

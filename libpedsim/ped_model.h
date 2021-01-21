@@ -50,6 +50,10 @@ class Model {
   int getHeatmapSize() const;
 
  private:
+  void tickSeq();
+  void tickOmp();
+  void tickThread();
+
   // Denotes which implementation (sequential, parallel implementations..)
   // should be used for calculating the desired positions of
   // agents (Assignment 1)

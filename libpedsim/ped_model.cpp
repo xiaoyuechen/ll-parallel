@@ -11,6 +11,8 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <iostream>
 #include <stack>
 #include <thread>
@@ -40,8 +42,62 @@ void Ped::Model::setup(std::vector<Ped::Tagent*> agentsInScenario,
   setupHeatmapSeq();
 }
 
+namespace {
+void move_agent(Ped::Tagent& agent) {
+  agent.computeNextDesiredPosition();
+  agent.setX(agent.getDesiredX());
+  agent.setY(agent.getDesiredY());
+}
+}  // namespace
+
+void Ped::Model::tickSeq() {
+  for (auto agent : agents) {
+    move_agent(*agent);
+  }
+}
+
+void Ped::Model::tickOmp() {
+#pragma omp parallel for
+  for (auto it = agents.begin(); it < agents.end(); ++it) {
+    move_agent(**it);
+  }
+}
+
+void Ped::Model::tickThread() {
+  static constexpr std::size_t kMaxThreads = 100;
+  auto thread_array = std::array<std::thread, kMaxThreads>{};
+  auto hardware_threads = std::thread::hardware_concurrency();
+  std::size_t thread_count =
+      hardware_threads > kMaxThreads ? kMaxThreads : hardware_threads;
+  std::size_t chunk = (agents.size() + thread_count - 1) / thread_count;
+  for (std::size_t i = 0; i != thread_count; ++i) {
+    auto begin = agents.begin() + i * chunk;
+    auto end = begin + chunk;
+    if (end > agents.end()) end = agents.end();
+    thread_array[i] = std::thread([=]() {
+      for (auto agent = begin; agent < end; ++agent) {
+        move_agent(**agent);
+      }
+    });
+  }
+
+  for (std::size_t i = 0; i != thread_count; ++i) {
+    thread_array[i].join();
+  }
+}
+
 void Ped::Model::tick() {
-  // EDIT HERE FOR ASSIGNMENT 1
+  switch (implementation) {
+    case IMPLEMENTATION::SEQ:
+      tickSeq();
+      break;
+    case IMPLEMENTATION::OMP:
+      tickOmp();
+      break;
+    case IMPLEMENTATION::PTHREAD:
+      tickThread();
+      break;
+  }
 }
 
 ////////////
