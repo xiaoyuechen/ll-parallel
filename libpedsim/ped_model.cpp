@@ -21,9 +21,6 @@
 #include "ped_model.h"
 #include "ped_waypoint.h"
 
-
-
-
 void Ped::Model::setup(std::vector<Ped::Tagent*> agentsInScenario,
                        std::vector<Twaypoint*> destinationsInScenario,
                        IMPLEMENTATION implementation) {
@@ -75,13 +72,12 @@ void Ped::Model::tickOmp() {
   }
 }
 
-
-static constexpr std::size_t kMaxThreads = 8;
-auto thread_array = std::array<std::thread, kMaxThreads>{};
-
 void Ped::Model::tickThread() {
-  std::size_t thread_count = 8;
-  std::size_t chunk = (std::size_t) ceil((double) agents.size() / thread_count);
+  static constexpr std::size_t kMaxThreads = 8;
+  auto thread_array = std::array<std::thread, kMaxThreads>{};
+  std::size_t thread_count =
+      std::min((std::size_t)omp_get_max_threads(), kMaxThreads);
+  std::size_t chunk = (std::size_t)ceil((double)agents.size() / thread_count);
 
   for (std::size_t i = 0; i < thread_count; i++) {
     auto begin = agents.begin() + i * chunk;
