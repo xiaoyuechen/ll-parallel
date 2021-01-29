@@ -1,6 +1,14 @@
 # 1DL550_Assignment
 Assignment of 1DL550 Low-level Parallel Programming at Uppsala University
 
+## How to choose different versions (serial, C++ Threads, and OpenMP implementation)
+Use the following command
+
+```
+$ demo/demo scenario.xml --timing-mode --tick-mode=seq
+```
+seq could be replaced by omp or thread to run the OpenMP/Thread versions.
+
 ## Prerequisite: Load dependencies on UPPMAX
 
 If you are using the UPPMAX cluster that is provided by the course, run the
