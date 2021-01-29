@@ -21,6 +21,9 @@
 #include "ped_model.h"
 #include "ped_waypoint.h"
 
+
+
+
 void Ped::Model::setup(std::vector<Ped::Tagent*> agentsInScenario,
                        std::vector<Twaypoint*> destinationsInScenario,
                        IMPLEMENTATION implementation) {
@@ -43,11 +46,20 @@ void Ped::Model::setup(std::vector<Ped::Tagent*> agentsInScenario,
 }
 
 namespace {
+
 void move_agent(Ped::Tagent& agent) {
   agent.computeNextDesiredPosition();
   agent.setX(agent.getDesiredX());
   agent.setY(agent.getDesiredY());
 }
+
+void thread_move_agents(std::vector<Ped::Tagent*>::iterator begin,
+                        std::vector<Ped::Tagent*>::iterator end) {
+  for (auto agent = begin; agent < end; ++agent) {
+    move_agent(**agent);
+  }
+}
+
 }  // namespace
 
 void Ped::Model::tickSeq() {
@@ -58,30 +70,27 @@ void Ped::Model::tickSeq() {
 
 void Ped::Model::tickOmp() {
 #pragma omp parallel for
-  for (auto it = agents.begin(); it < agents.end(); ++it) {
+  for (auto it = agents.begin(); it < agents.end(); it++) {
     move_agent(**it);
   }
 }
 
+
+static constexpr std::size_t kMaxThreads = 8;
+auto thread_array = std::array<std::thread, kMaxThreads>{};
+
 void Ped::Model::tickThread() {
-  static constexpr std::size_t kMaxThreads = 100;
-  auto thread_array = std::array<std::thread, kMaxThreads>{};
-  auto hardware_threads = omp_get_max_threads();
-  std::size_t thread_count =
-      hardware_threads > kMaxThreads ? kMaxThreads : hardware_threads;
-  std::size_t chunk = (agents.size() + thread_count - 1) / thread_count;
-  for (std::size_t i = 0; i != thread_count; ++i) {
+  std::size_t thread_count = 8;
+  std::size_t chunk = (std::size_t) ceil((double) agents.size() / thread_count);
+
+  for (std::size_t i = 0; i < thread_count; i++) {
     auto begin = agents.begin() + i * chunk;
     auto end = begin + chunk;
     if (end > agents.end()) end = agents.end();
-    thread_array[i] = std::thread([=]() {
-      for (auto agent = begin; agent < end; ++agent) {
-        move_agent(**agent);
-      }
-    });
+    thread_array[i] = std::thread(thread_move_agents, begin, end);
   }
 
-  for (std::size_t i = 0; i != thread_count; ++i) {
+  for (std::size_t i = 0; i < thread_count; i++) {
     thread_array[i].join();
   }
 }
@@ -91,11 +100,11 @@ void Ped::Model::tick() {
     case IMPLEMENTATION::SEQ:
       tickSeq();
       break;
-    case IMPLEMENTATION::OMP:
-      tickOmp();
-      break;
     case IMPLEMENTATION::PTHREAD:
       tickThread();
+      break;
+    case IMPLEMENTATION::OMP:
+      tickOmp();
       break;
   }
 }
