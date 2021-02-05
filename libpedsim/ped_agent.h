@@ -18,11 +18,13 @@
 
 #include <deque>
 #include <vector>
+#include <cstddef>
+
+#include "ped_waypoint.h"
 
 using namespace std;
 
 namespace Ped {
-class Twaypoint;
 
 class Tagent {
  public:
@@ -66,7 +68,8 @@ class Tagent {
   Twaypoint* lastDestination;
 
   // The queue of all destinations that this agent still has to visit
-  deque<Twaypoint*> waypoints;
+  vector<Twaypoint> waypoints;
+  std::size_t current_waypoint_pointer;
 
   // Internal init function
   void init(int posX, int posY);
