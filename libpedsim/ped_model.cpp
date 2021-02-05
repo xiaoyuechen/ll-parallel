@@ -7,7 +7,7 @@
 //
 #include "ped_model.h"
 
-#include <omp.h>
+#include <emmintrin.h>
 #include <stdlib.h>
 
 #include <algorithm>
@@ -91,6 +91,25 @@ void Ped::Model::tickThread() {
   }
 }
 
+void Ped::Model::tickVector() {
+  if (!agent_soa) {
+    tickSeq();
+    agent_soa = new AgentSoa(agents);
+  } else {
+    agent_soa->ComputeNextDestination();
+
+    // double diffX = destination->getx() - x;
+    // double diffY = destination->gety() - y;
+    // double len = sqrt(diffX * diffX + diffY * diffY);
+    // desiredPositionX = (int)round(x + diffX / len);
+    // desiredPositionY = (int)round(y + diffY / len);
+
+    __m128 dest_xs, dest_ys, dest_rs;  // floats
+    __m128 xs, ys;                     // ints
+    // dest_xs = _mm_load_ps(agent_soa->)
+  }
+}
+
 void Ped::Model::tick() {
   switch (implementation) {
     case IMPLEMENTATION::SEQ:
@@ -101,6 +120,9 @@ void Ped::Model::tick() {
       break;
     case IMPLEMENTATION::OMP:
       tickOmp();
+      break;
+    case IMPLEMENTATION::VECTOR:
+      tickVector();
       break;
   }
 }
@@ -188,4 +210,6 @@ Ped::Model::~Model() {
                 [](Ped::Tagent* agent) { delete agent; });
   std::for_each(destinations.begin(), destinations.end(),
                 [](Ped::Twaypoint* destination) { delete destination; });
+
+  delete agent_soa;
 }

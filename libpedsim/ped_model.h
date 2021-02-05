@@ -11,136 +11,21 @@
 #ifndef _ped_model_h_
 #define _ped_model_h_
 
-#include <emmintrin.h>
 #include <omp.h>
 
-#include <algorithm>
 #include <map>
 #include <set>
 #include <thread>
 #include <vector>
 
 #include "ped_agent.h"
+#include "ped_agent_soa.h"
 
 namespace Ped {
 
 // The implementation modes for Assignment 1 + 2:
 // chooses which implementation to use for tick()
 enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ };
-
-struct AgentsData {
-  explicit AgentsData(const std::vector<Tagent*>& agents) {
-    size = agents.size();
-    int* arrs[] = {xs, ys, desired_xs, desired_ys, current_way_point_idice};
-    for (auto& arr : arrs) {
-      arr = static_cast<int*>(_mm_malloc(size * sizeof(int), 16));
-    }
-
-    double* darrs[] = {
-        dest_xs,
-        dest_ys,
-        dest_rs,
-    };
-
-    for (auto& darr : darrs) {
-      darr = static_cast<double*>(_mm_malloc(size * sizeof(double), 16));
-    }
-
-    waypoints =
-        (const std::vector<Twaypoint>**)_mm_malloc(size * sizeof(void*), 16);
-
-    std::transform(agents.begin(), agents.end(), xs,
-                   [](const auto& agent) { return agent->x; });
-
-    std::transform(agents.begin(), agents.end(), ys,
-                   [](const auto& agent) { return agent->y; });
-
-    std::transform(agents.begin(), agents.end(), desired_xs,
-                   [](const auto& agent) { return agent->desiredPositionX; });
-
-    std::transform(agents.begin(), agents.end(), desired_ys,
-                   [](const auto& agent) { return agent->desiredPositionY; });
-
-    std::transform(
-        agents.begin(), agents.end(), current_way_point_idice,
-        [](const auto& agent) { return agent->current_waypoint_pointer; });
-
-    std::transform(
-        agents.begin(), agents.end(), dest_xs,
-        [](const auto& agent) { return agent->destination->getx(); });
-
-    std::transform(
-        agents.begin(), agents.end(), dest_ys,
-        [](const auto& agent) { return agent->destination->getx(); });
-
-    std::transform(
-        agents.begin(), agents.end(), dest_rs,
-        [](const auto& agent) { return agent->destination->getr(); });
-
-    std::transform(agents.begin(), agents.end(), waypoints,
-                   [](const auto& agent) { return &(agent->waypoints); });
-  }
-
-  AgentsData(const AgentsData&) = delete;
-
-  ~AgentsData() {
-    int* arrs[] = {xs, ys, desired_xs, desired_ys, current_way_point_idice};
-    for (auto arr : arrs) {
-      _mm_free(arr);
-    }
-
-    double* darrs[] = {
-        dest_xs,
-        dest_ys,
-        dest_rs,
-    };
-
-    for (auto darr : darrs) {
-      _mm_free(darr);
-    }
-
-    _mm_free(waypoints);
-  }
-
-  void ComputeNextDestination() noexcept {
-    // #pragma omp parallel for
-    //     for (int i = 0; i < size; ++i) {
-    //       Ped::Twaypoint* nextDestination = NULL;
-
-    //       // compute if agent reached its current destination
-    //       double diffX = dest_xs[i] - xs[i];
-    //       double diffY = dest_ys[i] - ys[i];
-    //       double length = diffX * diffX + diffY * diffY;
-    //       bool agentReachedDestination = length < (dest_rs[i] * dest_rs[i]);
-
-    //       if ((agentReachedDestination) && !waypoints.empty()) {
-    //         // Case 1: agent has reached destination (or has no current
-    //         // destination); get next destination if available
-    //         current_waypoint_pointer =
-    //             (current_waypoint_pointer + 1) % waypoints.size();
-    //         nextDestination = &waypoints[current_waypoint_pointer];
-    //       } else {
-    //         // Case 2: agent has not yet reached destination, continue to
-    //         move
-    //         // towards current destination
-    //         nextDestination = destination;
-    //       }
-
-    //       return nextDestination;
-    //     }
-  }
-
-  std::size_t size;
-  int* xs;
-  int* ys;
-  int* desired_xs;
-  int* desired_ys;
-  int* current_way_point_idice;
-  double* dest_xs;
-  double* dest_ys;
-  double* dest_rs;
-  const std::vector<Twaypoint>** waypoints;
-};
 
 class Model {
  public:
@@ -171,6 +56,7 @@ class Model {
   void tickSeq();
   void tickOmp();
   void tickThread();
+  void tickVector();
 
   // Denotes which implementation (sequential, parallel implementations..)
   // should be used for calculating the desired positions of
@@ -182,6 +68,8 @@ class Model {
 
   // The waypoints in this scenario
   std::vector<Twaypoint*> destinations;
+
+  AgentSoa* agent_soa = nullptr;
 
   // Moves an agent towards its next position
   void move(Ped::Tagent* agent);
