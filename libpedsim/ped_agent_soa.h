@@ -16,24 +16,7 @@ struct AgentSoa {
 
   AgentSoa(const AgentSoa&) = delete;
 
-  ~AgentSoa() {
-    int* arrs[] = {xs, ys, desired_xs, desired_ys, current_waypoint_indice};
-    for (auto arr : arrs) {
-      _mm_free(arr);
-    }
-
-    double* darrs[] = {
-        dest_xs,
-        dest_ys,
-        dest_rs,
-    };
-
-    for (auto darr : darrs) {
-      _mm_free(darr);
-    }
-
-    _mm_free(waypoints);
-  }
+  ~AgentSoa();
 
   void ComputeNextDestination() noexcept {
     for (int i = 0; i < size; ++i) {
@@ -56,14 +39,14 @@ struct AgentSoa {
   }
 
   std::size_t size;
-  int* xs;
-  int* ys;
-  int* desired_xs;
-  int* desired_ys;
+  float* xs;
+  float* ys;
+  float* desired_xs;
+  float* desired_ys;
   int* current_waypoint_indice;
-  double* dest_xs;
-  double* dest_ys;
-  double* dest_rs;
+  float* dest_xs;
+  float* dest_ys;
+  float* dest_rs;
   const std::vector<Twaypoint>** waypoints;
 };
 

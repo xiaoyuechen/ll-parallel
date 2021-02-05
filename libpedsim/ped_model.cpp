@@ -94,19 +94,41 @@ void Ped::Model::tickThread() {
 void Ped::Model::tickVector() {
   if (!agent_soa) {
     tickSeq();
+    printf("[%f, %f]\n", agents[2]->destination->getx(),
+           agents[2]->destination->gety());
     agent_soa = new AgentSoa(agents);
-  } else {
-    agent_soa->ComputeNextDestination();
+    printf("[%f, %f]\n", agent_soa->dest_xs[2], agent_soa->dest_ys[2]);
+  }
+  
+  agent_soa->ComputeNextDestination();
 
-    // double diffX = destination->getx() - x;
-    // double diffY = destination->gety() - y;
-    // double len = sqrt(diffX * diffX + diffY * diffY);
-    // desiredPositionX = (int)round(x + diffX / len);
-    // desiredPositionY = (int)round(y + diffY / len);
+  // double diffX = destination->getx() - x;
+  // double diffY = destination->gety() - y;
+  // double len = sqrt(diffX * diffX + diffY * diffY);
+  // desiredPositionX = (int)round(x + diffX / len);
+  // desiredPositionY = (int)round(y + diffY / len);
+  for (int i = 0; i != agent_soa->size / 4; ++i) {
+    int stride = i * 4;
+    auto dest_x = _mm_load_ps(agent_soa->dest_xs + stride);  // diff x
+    auto dest_y = _mm_load_ps(agent_soa->dest_ys + stride);  // diff y
+    auto x = _mm_load_ps(agent_soa->xs + stride);            // x
+    auto y = _mm_load_ps(agent_soa->ys + stride);            // y
+    auto diff_x = _mm_sub_ps(dest_x, x);                     // diff x
+    auto diff_y = _mm_sub_ps(dest_y, y);                     // diff y
+    auto len = _mm_sqrt_ps(
+        _mm_add_ps(_mm_mul_ps(diff_x, diff_x), _mm_mul_ps(diff_y, diff_y)));
+    auto desired_x = _mm_mul_ps(x, _mm_div_ps(diff_x, len));
+    auto desired_y = _mm_mul_ps(y, _mm_div_ps(diff_y, len));
 
-    __m128 dest_xs, dest_ys, dest_rs;  // floats
-    __m128 xs, ys;                     // ints
-    // dest_xs = _mm_load_ps(agent_soa->)
+    _mm_store_ps(agent_soa->desired_xs + stride, desired_x);
+    _mm_store_ps(agent_soa->desired_ys + stride, desired_y);
+    _mm_store_ps(agent_soa->xs + stride, desired_x);
+    _mm_store_ps(agent_soa->ys + stride, desired_y);
+  }
+
+  for (int i = 0; i != agent_soa->size; ++i) {
+    agents[i]->setX(agent_soa->desired_xs[i]);
+    agents[i]->setY(agent_soa->desired_ys[i]);
   }
 }
 

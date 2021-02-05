@@ -4,19 +4,28 @@ namespace Ped {
 
 AgentSoa::AgentSoa(const std::vector<Tagent*>& agents) {
   size = agents.size();
-  int* arrs[] = {xs, ys, desired_xs, desired_ys, current_waypoint_indice};
+  float** arrs[] = {
+      &xs,
+      &ys,
+      &desired_xs,
+      &desired_ys,
+  };
+
   for (auto& arr : arrs) {
-    arr = static_cast<int*>(_mm_malloc(size * sizeof(int), kAlignment));
+    *arr = static_cast<float*>(_mm_malloc(size * sizeof(float), kAlignment));
   }
 
-  double* darrs[] = {
-      dest_xs,
-      dest_ys,
-      dest_rs,
+  current_waypoint_indice =
+      static_cast<int*>(_mm_malloc(size * sizeof(int), kAlignment));
+
+  float** darrs[] = {
+      &dest_xs,
+      &dest_ys,
+      &dest_rs,
   };
 
   for (auto& darr : darrs) {
-    darr = static_cast<double*>(_mm_malloc(size * sizeof(double), kAlignment));
+    *darr = static_cast<float*>(_mm_malloc(size * sizeof(float), kAlignment));
   }
 
   waypoints = (const std::vector<Twaypoint>**)_mm_malloc(size * sizeof(void*),
@@ -39,16 +48,40 @@ AgentSoa::AgentSoa(const std::vector<Tagent*>& agents) {
       [](const auto& agent) { return agent->current_waypoint_pointer; });
 
   std::transform(agents.begin(), agents.end(), dest_xs,
-                 [](const auto& agent) { return agent->destination->getx(); });
+                 [](const auto& agent) { return agent->destination->getx();
+                 });
 
   std::transform(agents.begin(), agents.end(), dest_ys,
-                 [](const auto& agent) { return agent->destination->getx(); });
+                 [](const auto& agent) { return agent->destination->gety();
+                 });
 
   std::transform(agents.begin(), agents.end(), dest_rs,
-                 [](const auto& agent) { return agent->destination->getr(); });
+                 [](const auto& agent) { return agent->destination->getr();
+                 });
 
   std::transform(agents.begin(), agents.end(), waypoints,
                  [](const auto& agent) { return &(agent->waypoints); });
+}
+
+AgentSoa::~AgentSoa() {
+  float* arrs[] = {xs, ys, desired_xs, desired_ys};
+  for (auto arr : arrs) {
+    _mm_free(arr);
+  }
+
+  _mm_free(current_waypoint_indice);
+
+  float* darrs[] = {
+      dest_xs,
+      dest_ys,
+      dest_rs,
+  };
+
+  for (auto darr : darrs) {
+    _mm_free(darr);
+  }
+
+  _mm_free(waypoints);
 }
 
 }  // namespace Ped
