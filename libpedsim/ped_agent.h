@@ -50,8 +50,7 @@ class Tagent {
   // Adds a new waypoint to reach for this agent
   void addWaypoint(Twaypoint* wp);
 
- private:
-  Tagent(){};
+  Tagent() = delete;
 
   // The agent's current position
   int x;
