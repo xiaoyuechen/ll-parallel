@@ -5,12 +5,12 @@
 
   <!-- conveniently divisible by 8 -->
   <!-- agents -->
-  <agent x="30" y="60" n="10000" dx="40" dy="60">
+  <agent x="30" y="60" n="200" dx="40" dy="60">
     <addwaypoint id="w1" />
     <addwaypoint id="w2" />
   </agent>
 
-  <agent x="130" y="60" n="10000" dx="50" dy="30">
+  <agent x="130" y="60" n="200" dx="50" dy="30">
     <addwaypoint id="w2" />
     <addwaypoint id="w1" />
   </agent>
