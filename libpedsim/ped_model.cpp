@@ -7,7 +7,7 @@
 //
 #include "ped_model.h"
 
-#include <emmintrin.h>
+#include <smmintrin.h>
 #include <stdlib.h>
 
 #include <algorithm>
@@ -20,6 +20,8 @@
 #include "cuda_testkernel.h"
 #include "ped_model.h"
 #include "ped_waypoint.h"
+
+namespace Ped {
 
 void Ped::Model::setup(std::vector<Ped::Tagent*> agentsInScenario,
                        std::vector<Twaypoint*> destinationsInScenario,
@@ -91,45 +93,56 @@ void Ped::Model::tickThread() {
   }
 }
 
+void PrintAgentSoa(const AgentSoa& soa, int idx) {
+  printf("xy: [%f, %f]; dest_xyr: [%f, %f, %f], idx: %d\n", soa.xs[idx],
+         soa.ys[idx], soa.dest_xs[idx], soa.dest_ys[idx], soa.dest_rs[idx],
+         soa.current_waypoint_indice[idx]);
+}
+
+void PrintAgent(const Tagent& agent) {
+  printf("xy: [%f, %f]; dest_xyr: [%f, %f, %f], idx: %d\n", float(agent.x),
+         float(agent.y), agent.destination->getx(), agent.destination->gety(),
+         agent.destination->getr(), agent.current_waypoint_pointer);
+}
+
 void Ped::Model::tickVector() {
   if (!agent_soa) {
     tickSeq();
-    printf("[%f, %f]\n", agents[2]->destination->getx(),
-           agents[2]->destination->gety());
     agent_soa = new AgentSoa(agents);
-    printf("[%f, %f]\n", agent_soa->dest_xs[2], agent_soa->dest_ys[2]);
   }
-  
-  agent_soa->ComputeNextDestination();
+    agent_soa->ComputeNextDestination();
 
-  // double diffX = destination->getx() - x;
-  // double diffY = destination->gety() - y;
-  // double len = sqrt(diffX * diffX + diffY * diffY);
-  // desiredPositionX = (int)round(x + diffX / len);
-  // desiredPositionY = (int)round(y + diffY / len);
-  for (int i = 0; i != agent_soa->size / 4; ++i) {
-    int stride = i * 4;
-    auto dest_x = _mm_load_ps(agent_soa->dest_xs + stride);  // diff x
-    auto dest_y = _mm_load_ps(agent_soa->dest_ys + stride);  // diff y
-    auto x = _mm_load_ps(agent_soa->xs + stride);            // x
-    auto y = _mm_load_ps(agent_soa->ys + stride);            // y
-    auto diff_x = _mm_sub_ps(dest_x, x);                     // diff x
-    auto diff_y = _mm_sub_ps(dest_y, y);                     // diff y
-    auto len = _mm_sqrt_ps(
-        _mm_add_ps(_mm_mul_ps(diff_x, diff_x), _mm_mul_ps(diff_y, diff_y)));
-    auto desired_x = _mm_mul_ps(x, _mm_div_ps(diff_x, len));
-    auto desired_y = _mm_mul_ps(y, _mm_div_ps(diff_y, len));
+    for (int i = 0; i != agent_soa->size / 4; ++i) {
+      int stride = i * 4;
 
-    _mm_store_ps(agent_soa->desired_xs + stride, desired_x);
-    _mm_store_ps(agent_soa->desired_ys + stride, desired_y);
-    _mm_store_ps(agent_soa->xs + stride, desired_x);
-    _mm_store_ps(agent_soa->ys + stride, desired_y);
-  }
+      __m128 dest_x = _mm_load_ps(&agent_soa->dest_xs[stride]);
+      __m128 dest_y = _mm_load_ps(&agent_soa->dest_ys[stride]);
+      __m128 x = _mm_load_ps(&agent_soa->xs[stride]);
+      __m128 y = _mm_load_ps(&agent_soa->ys[stride]);
 
-  for (int i = 0; i != agent_soa->size; ++i) {
-    agents[i]->setX(agent_soa->desired_xs[i]);
-    agents[i]->setY(agent_soa->desired_ys[i]);
-  }
+      __m128 diff_x = _mm_sub_ps(dest_x, x);
+      __m128 diff_y = _mm_sub_ps(dest_y, y);
+      __m128 len = _mm_sqrt_ps(
+          _mm_add_ps(_mm_mul_ps(diff_x, diff_x), _mm_mul_ps(diff_y, diff_y)));
+      __m128 desired_x = _mm_add_ps(x, _mm_div_ps(diff_x, len));
+      __m128 desired_y = _mm_add_ps(y, _mm_div_ps(diff_y, len));
+      // desired_x = _mm_round_ps(desired_x,
+      //                          (_MM_FROUND_TO_NEAREST_INT |
+      //                          _MM_FROUND_NO_EXC));
+      // desired_y = _mm_round_ps(desired_y,
+      //                          (_MM_FROUND_TO_NEAREST_INT |
+      //                          _MM_FROUND_NO_EXC));
+
+      // _mm_store_ps(agent_soa->desired_xs + stride, desired_x);
+      // _mm_store_ps(agent_soa->desired_ys + stride, desired_y);
+      _mm_store_ps(&agent_soa->xs[stride], desired_x);
+      _mm_store_ps(&agent_soa->ys[stride], desired_y);
+    }
+
+    for (int i = 0; i != agent_soa->size; ++i) {
+      agents[i]->setX(agent_soa->xs[i]);
+      agents[i]->setY(agent_soa->ys[i]);
+    }
 }
 
 void Ped::Model::tick() {
@@ -235,3 +248,6 @@ Ped::Model::~Model() {
 
   delete agent_soa;
 }
+
+}  // namespace Ped
+

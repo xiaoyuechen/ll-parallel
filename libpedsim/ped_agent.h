@@ -16,9 +16,9 @@
 #ifndef _ped_agent_h_
 #define _ped_agent_h_ 1
 
+#include <cstddef>
 #include <deque>
 #include <vector>
-#include <cstddef>
 
 #include "ped_waypoint.h"
 
@@ -68,7 +68,7 @@ class Tagent {
 
   // The queue of all destinations that this agent still has to visit
   vector<Twaypoint> waypoints;
-  std::size_t current_waypoint_pointer;
+  std::size_t current_waypoint_pointer = 0;
 
   // Internal init function
   void init(int posX, int posY);

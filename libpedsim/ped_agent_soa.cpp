@@ -5,28 +5,21 @@ namespace Ped {
 AgentSoa::AgentSoa(const std::vector<Tagent*>& agents) {
   size = agents.size();
   float** arrs[] = {
-      &xs,
-      &ys,
-      &desired_xs,
-      &desired_ys,
+    &xs,
+    &ys,
+    &desired_xs,
+    &desired_ys,
+    &dest_xs,
+    &dest_ys,
+    &dest_rs,
   };
 
-  for (auto& arr : arrs) {
+  for (auto arr : arrs) {
     *arr = static_cast<float*>(_mm_malloc(size * sizeof(float), kAlignment));
   }
 
   current_waypoint_indice =
       static_cast<int*>(_mm_malloc(size * sizeof(int), kAlignment));
-
-  float** darrs[] = {
-      &dest_xs,
-      &dest_ys,
-      &dest_rs,
-  };
-
-  for (auto& darr : darrs) {
-    *darr = static_cast<float*>(_mm_malloc(size * sizeof(float), kAlignment));
-  }
 
   waypoints = (const std::vector<Twaypoint>**)_mm_malloc(size * sizeof(void*),
                                                          kAlignment);
