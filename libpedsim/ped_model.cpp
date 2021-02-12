@@ -59,6 +59,8 @@ void thread_move_agents(std::vector<Ped::Tagent*>::iterator begin,
   }
 }
 
+// __global__ void
+
 }  // namespace
 
 void Ped::Model::tickSeq() {
@@ -110,39 +112,46 @@ void Ped::Model::tickVector() {
     tickSeq();
     agent_soa = new AgentSoa(agents);
   }
-    agent_soa->ComputeNextDestination();
 
-    for (int i = 0; i != agent_soa->size / 4; ++i) {
-      int stride = i * 4;
+  agent_soa->ComputeNextDestination();
 
-      __m128 dest_x = _mm_load_ps(&agent_soa->dest_xs[stride]);
-      __m128 dest_y = _mm_load_ps(&agent_soa->dest_ys[stride]);
-      __m128 x = _mm_load_ps(&agent_soa->xs[stride]);
-      __m128 y = _mm_load_ps(&agent_soa->ys[stride]);
+  // #pragma omp parallel for
+  int iter = (int)::ceilf((float)agent_soa->size / 4);
+  for (int i = 0; i < iter; ++i) {
+    int stride = i * 4;
 
-      __m128 diff_x = _mm_sub_ps(dest_x, x);
-      __m128 diff_y = _mm_sub_ps(dest_y, y);
-      __m128 len = _mm_sqrt_ps(
-          _mm_add_ps(_mm_mul_ps(diff_x, diff_x), _mm_mul_ps(diff_y, diff_y)));
-      __m128 desired_x = _mm_add_ps(x, _mm_div_ps(diff_x, len));
-      __m128 desired_y = _mm_add_ps(y, _mm_div_ps(diff_y, len));
-      // desired_x = _mm_round_ps(desired_x,
-      //                          (_MM_FROUND_TO_NEAREST_INT |
-      //                          _MM_FROUND_NO_EXC));
-      // desired_y = _mm_round_ps(desired_y,
-      //                          (_MM_FROUND_TO_NEAREST_INT |
-      //                          _MM_FROUND_NO_EXC));
+    // SIMD code
 
-      // _mm_store_ps(agent_soa->desired_xs + stride, desired_x);
-      // _mm_store_ps(agent_soa->desired_ys + stride, desired_y);
-      _mm_store_ps(&agent_soa->xs[stride], desired_x);
-      _mm_store_ps(&agent_soa->ys[stride], desired_y);
-    }
+    // for loop seq next waypoint
 
-    for (int i = 0; i != agent_soa->size; ++i) {
-      agents[i]->setX(agent_soa->xs[i]);
-      agents[i]->setY(agent_soa->ys[i]);
-    }
+    // SIMD code
+    __m128 dest_x = _mm_load_ps(&agent_soa->dest_xs[stride]);
+    __m128 dest_y = _mm_load_ps(&agent_soa->dest_ys[stride]);
+    __m128 x = _mm_load_ps(&agent_soa->xs[stride]);
+    __m128 y = _mm_load_ps(&agent_soa->ys[stride]);
+
+    __m128 diff_x = _mm_sub_ps(dest_x, x);
+    __m128 diff_y = _mm_sub_ps(dest_y, y);
+    __m128 len = _mm_sqrt_ps(
+        _mm_add_ps(_mm_mul_ps(diff_x, diff_x), _mm_mul_ps(diff_y, diff_y)));
+    __m128 desired_x = _mm_add_ps(x, _mm_div_ps(diff_x, len));
+    __m128 desired_y = _mm_add_ps(y, _mm_div_ps(diff_y, len));
+
+    desired_x = _mm_round_ps(desired_x,
+                             (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+    desired_y = _mm_round_ps(desired_y,
+                             (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+    // _mm_store_ps(agent_soa->desired_xs + stride, desired_x);
+    // _mm_store_ps(agent_soa->desired_ys + stride, desired_y);
+    _mm_store_ps(&agent_soa->xs[stride], desired_x);
+    _mm_store_ps(&agent_soa->ys[stride], desired_y);
+  }
+
+#pragma omp parallel for
+  for (int i = 0; i < agent_soa->size; ++i) {
+    agents[i]->setX(agent_soa->xs[i]);
+    agents[i]->setY(agent_soa->ys[i]);
+  }
 }
 
 void Ped::Model::tick() {
@@ -250,4 +259,3 @@ Ped::Model::~Model() {
 }
 
 }  // namespace Ped
-
