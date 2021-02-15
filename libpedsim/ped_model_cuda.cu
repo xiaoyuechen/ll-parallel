@@ -80,6 +80,7 @@ void Model::tickCuda() {
 
     CopyAgentsPosToHost(*agent_soa, g_cuda_soa);
 
+#pragma omp parallel for
     for (int i = 0; i < agent_soa->size; ++i) {
         agents[i]->setX(agent_soa->xs[i]);
         agents[i]->setY(agent_soa->ys[i]);

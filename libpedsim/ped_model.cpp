@@ -17,8 +17,7 @@
 #include <stack>
 #include <thread>
 
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+
 #include "cuda_testkernel.h"
 #include "ped_model.h"
 #include "ped_waypoint.h"
