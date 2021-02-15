@@ -17,6 +17,8 @@
 #include <stack>
 #include <thread>
 
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
 #include "cuda_testkernel.h"
 #include "ped_model.h"
 #include "ped_waypoint.h"
@@ -58,8 +60,6 @@ void thread_move_agents(std::vector<Ped::Tagent*>::iterator begin,
     move_agent(**agent);
   }
 }
-
-// __global__ void
 
 }  // namespace
 
@@ -167,6 +167,9 @@ void Ped::Model::tick() {
       break;
     case IMPLEMENTATION::VECTOR:
       tickVector();
+      break;
+    case IMPLEMENTATION::CUDA:
+      tickCuda();
       break;
   }
 }

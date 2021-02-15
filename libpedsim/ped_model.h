@@ -57,6 +57,7 @@ class Model {
   void tickOmp();
   void tickThread();
   void tickVector();
+  void tickCuda();
 
   // Denotes which implementation (sequential, parallel implementations..)
   // should be used for calculating the desired positions of

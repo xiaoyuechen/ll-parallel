@@ -13,6 +13,8 @@ namespace Ped {
 struct AgentSoa {
   static constexpr std::size_t kAlignment = 16;
 
+  AgentSoa() = default;
+
   explicit AgentSoa(const std::vector<Tagent*>& agents);
 
   AgentSoa(const AgentSoa&) = delete;
