@@ -1,0 +1,6 @@
+Implementation Speedup
+Seq 1.068131
+OMP 0.5187992
+Thread 0.01812958
+Vector 0.4829888
+CUDA 0.007313638
