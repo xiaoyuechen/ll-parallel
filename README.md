@@ -7,7 +7,7 @@ Use the following command
 ```
 $ demo/demo scenario.xml --timing-mode --tick-mode=seq
 ```
-"seq" could be replaced by "omp" or "thread" to run the OpenMP/Thread versions.
+"seq" could be replaced by omp/thread/vector/cuda to run the different versions.
 
 ## Prerequisite: Load dependencies on UPPMAX
 
