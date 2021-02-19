@@ -13,9 +13,15 @@ namespace Ped {
 struct AgentSoa {
   static constexpr std::size_t kAlignment = 16;
 
+  enum class MemType {
+    kNone,
+    kAligned,
+    kPinned,
+  };
+
   AgentSoa() = default;
 
-  explicit AgentSoa(const std::vector<Tagent*>& agents);
+  AgentSoa(const std::vector<Tagent*>& agents, MemType mem_type);
 
   AgentSoa(const AgentSoa&) = delete;
 
@@ -41,6 +47,7 @@ struct AgentSoa {
     }
   }
 
+  MemType mem_type;
   std::size_t size;
   float* xs;
   float* ys;

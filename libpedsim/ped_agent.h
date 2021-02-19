@@ -44,8 +44,15 @@ class Tagent {
   void computeNextDesiredPosition();
 
   // Position of agent defined by x and y
-  int getX() const { return x; };
-  int getY() const { return y; };
+  int getX() const {
+    if (x_ptr) return *x_ptr;
+    return x;
+  };
+
+  int getY() const {
+    if (y_ptr) return *y_ptr;
+    return y;
+  };
 
   // Adds a new waypoint to reach for this agent
   void addWaypoint(Twaypoint* wp);
@@ -55,6 +62,9 @@ class Tagent {
   // The agent's current position
   int x;
   int y;
+
+  float* x_ptr = nullptr;
+  float* y_ptr = nullptr;
 
   // The agent's desired next position
   int desiredPositionX;

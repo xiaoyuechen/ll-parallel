@@ -109,7 +109,11 @@ void PrintAgent(const Tagent& agent) {
 void Ped::Model::tickVector() {
   if (!agent_soa) {
     tickSeq();
-    agent_soa = new AgentSoa(agents);
+    agent_soa = new AgentSoa(agents, AgentSoa::MemType::kAligned);
+    for(std::size_t i = 0; i != agents.size(); ++i) {
+      agents[i]->x_ptr = &agent_soa->xs[i];
+      agents[i]->y_ptr = &agent_soa->ys[i];
+    }
   }
 
   agent_soa->ComputeNextDestination();
@@ -144,12 +148,6 @@ void Ped::Model::tickVector() {
     // _mm_store_ps(agent_soa->desired_ys + stride, desired_y);
     _mm_store_ps(&agent_soa->xs[stride], desired_x);
     _mm_store_ps(&agent_soa->ys[stride], desired_y);
-  }
-
-#pragma omp parallel for
-  for (int i = 0; i < agent_soa->size; ++i) {
-    agents[i]->setX(agent_soa->xs[i]);
-    agents[i]->setY(agent_soa->ys[i]);
   }
 }
 

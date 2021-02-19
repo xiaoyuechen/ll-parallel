@@ -21,7 +21,7 @@ struct AgentSoaCuda {
     float* xs, *ys, *dest_xs, *dest_ys, *dest_rs;
 };
 
-AgentSoaCuda AllocateAgentSoaCuda(std::size_t agent_count) {
+AgentSoaCuda AllocateAgentSoaDevice(std::size_t agent_count) {
     AgentSoaCuda cuda_soa;
     int alloc_size = agent_count * sizeof(float);
     cudaMalloc((void**) &cuda_soa.xs, alloc_size);
@@ -32,7 +32,7 @@ AgentSoaCuda AllocateAgentSoaCuda(std::size_t agent_count) {
     return cuda_soa;
 }
 
-void CopyAgentsToCuda(const AgentSoa& cpu_soa, const AgentSoaCuda& gpu_soa) {
+void InitDevice(const AgentSoa& cpu_soa, const AgentSoaCuda& gpu_soa) {
     int alloc_size = cpu_soa.size * sizeof(float);
     cudaMemcpy(gpu_soa.xs, cpu_soa.xs, alloc_size, cudaMemcpyHostToDevice);
     cudaMemcpy(gpu_soa.ys, cpu_soa.ys, alloc_size, cudaMemcpyHostToDevice);
@@ -41,50 +41,52 @@ void CopyAgentsToCuda(const AgentSoa& cpu_soa, const AgentSoaCuda& gpu_soa) {
     cudaMemcpy(gpu_soa.dest_rs, cpu_soa.dest_rs, alloc_size, cudaMemcpyHostToDevice);
 }
 
-void CopyAgentsDestToCuda(const AgentSoa& cpu_soa, const AgentSoaCuda& gpu_soa) {
-    int alloc_size = cpu_soa.size * sizeof(float);
-    cudaMemcpy(gpu_soa.dest_xs, cpu_soa.dest_xs, alloc_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(gpu_soa.dest_ys, cpu_soa.dest_ys, alloc_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(gpu_soa.dest_rs, cpu_soa.dest_rs, alloc_size, cudaMemcpyHostToDevice);
+void CopyHostToDevice(const AgentSoa& host_pinned, const AgentSoaCuda& device, std::size_t agent_count) {
+    int alloc_size = agent_count * sizeof(float);
+
+    cudaMemcpy(device.dest_xs, host_pinned.dest_xs, alloc_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(device.dest_ys, host_pinned.dest_ys, alloc_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(device.dest_rs, host_pinned.dest_rs, alloc_size, cudaMemcpyHostToDevice);
 }
 
-void CopyAgentsPosToHost(const AgentSoa& cpu_soa, const AgentSoaCuda& gpu_soa) {
-    int alloc_size = cpu_soa.size * sizeof(float);
-    cudaMemcpy(cpu_soa.xs, gpu_soa.xs, alloc_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(cpu_soa.ys, gpu_soa.ys, alloc_size, cudaMemcpyDeviceToHost);
+void CopyDeviceToHost(const AgentSoa& host_pinned, const AgentSoaCuda& device, std::size_t agent_count) {
+    int alloc_size = agent_count * sizeof(float);
+
+    cudaMemcpy(host_pinned.xs, device.xs, alloc_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_pinned.ys, device.ys, alloc_size, cudaMemcpyDeviceToHost);
 }
 
-static AgentSoaCuda g_cuda_soa;
+static AgentSoaCuda g_device;
 
 void Model::tickCuda() {
     if (!agent_soa) {
         tickSeq();
-        agent_soa = new AgentSoa(agents);
+        agent_soa = new AgentSoa(agents, AgentSoa::MemType::kPinned);
+        
+        for(std::size_t i = 0; i != agents.size(); ++i) {
+            agents[i]->x_ptr = &agent_soa->xs[i];
+            agents[i]->y_ptr = &agent_soa->ys[i];
+        }
 
-        g_cuda_soa = AllocateAgentSoaCuda(agent_soa->size);
-        CopyAgentsToCuda(*agent_soa, g_cuda_soa);
+        g_device = AllocateAgentSoaDevice(agent_soa->size);
+        InitDevice(*agent_soa, g_device);
     }
 
+    int size = agent_soa->size;
     agent_soa->ComputeNextDestination();
-    CopyAgentsDestToCuda(*agent_soa, g_cuda_soa);
+    CopyHostToDevice(*agent_soa, g_device, size);
 
     int num_blocks = (agent_soa->size + 1023)/1024;
     updateAgentPos<<<num_blocks, 1024>>>(
-        agent_soa->size,
-        g_cuda_soa.xs,
-        g_cuda_soa.ys,
-        g_cuda_soa.dest_xs,
-        g_cuda_soa.dest_ys,
-        g_cuda_soa.dest_rs
+        size,
+        g_device.xs,
+        g_device.ys,
+        g_device.dest_xs,
+        g_device.dest_ys,
+        g_device.dest_rs
     );
 
-    CopyAgentsPosToHost(*agent_soa, g_cuda_soa);
-
-#pragma omp parallel for
-    for (int i = 0; i < agent_soa->size; ++i) {
-        agents[i]->setX(agent_soa->xs[i]);
-        agents[i]->setY(agent_soa->ys[i]);
-    }
+    CopyDeviceToHost(*agent_soa, g_device, size);
 }
 
 } // namespace Ped
