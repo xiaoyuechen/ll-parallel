@@ -63,7 +63,8 @@ void thread_move_agents(std::vector<Ped::Tagent*>::iterator begin,
 
 void Ped::Model::tickSeq() {
   for (auto agent : agents) {
-    move_agent(*agent);
+    agent->computeNextDesiredPosition();
+    move(agent);
   }
 }
 
@@ -150,6 +151,40 @@ void Ped::Model::tickVector() {
   }
 }
 
+void Model::ComputeDesiredPos() {
+  agent_soa->ComputeNextDestination();
+
+  // #pragma omp parallel for
+  int iter = (int)::ceilf((float)agent_soa->size / 4);
+  for (int i = 0; i < iter; ++i) {
+    int stride = i * 4;
+
+    // SIMD code
+
+    // for loop seq next waypoint
+
+    // SIMD code
+    __m128 dest_x = _mm_load_ps(&agent_soa->dest_xs[stride]);
+    __m128 dest_y = _mm_load_ps(&agent_soa->dest_ys[stride]);
+    __m128 x = _mm_load_ps(&agent_soa->xs[stride]);
+    __m128 y = _mm_load_ps(&agent_soa->ys[stride]);
+
+    __m128 diff_x = _mm_sub_ps(dest_x, x);
+    __m128 diff_y = _mm_sub_ps(dest_y, y);
+    __m128 len = _mm_sqrt_ps(
+        _mm_add_ps(_mm_mul_ps(diff_x, diff_x), _mm_mul_ps(diff_y, diff_y)));
+    __m128 desired_x = _mm_add_ps(x, _mm_div_ps(diff_x, len));
+    __m128 desired_y = _mm_add_ps(y, _mm_div_ps(diff_y, len));
+
+    desired_x = _mm_round_ps(desired_x,
+                             (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+    desired_y = _mm_round_ps(desired_y,
+                             (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+    _mm_store_ps(&agent_soa->desired_xs[stride], desired_x);
+    _mm_store_ps(&agent_soa->desired_ys[stride], desired_y);
+  }
+}
+
 void Model::tickRegion() {
   if (!agent_soa) {
     tickSeq();
@@ -159,13 +194,21 @@ void Model::tickRegion() {
       agents[i]->y_ptr = &agent_soa->ys[i];
     }
     agent_idx_array = new AgentIdxArray(agents.size());
+
+    state = new std::uint32_t*[200];
+    for (int i = 0; i < 200; ++i) state[i] = new std::uint32_t[200];
+    
+    for (int i = 0; i != 200; ++i)
+      for (int j = 0; j != 200; ++j) state[i][j] = ~std::uint32_t(0);
+
+    for (std::size_t i = 0; i != agents.size(); ++i) {
+      int x = (int)agent_soa->xs[i];
+      int y = (int)agent_soa->ys[i];
+      state[x][y] = i;
+    }
   }
-  agent_soa->ComputeNextDestination();
   SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
-  // for (std::size_t i = 0; i < agents.size(); i++) {
-  //   printf("%u ",agent_idx_array->indice[i]);
-  // }
-  // printf("\n");
+  ComputeDesiredPos();
 
 #pragma omp parallel
   {
@@ -176,19 +219,64 @@ void Model::tickRegion() {
         agent_idx_array->indice + thread_id * region_agent_count;
     std::uint32_t* end =
         agent_idx_array->indice + (thread_id + 1) * region_agent_count;
+    if (end > agent_idx_array->indice + agent_soa->size)
+      end = agent_idx_array->indice + agent_soa->size;
     // printf("%u, %u\n", *begin, *end);
     move(begin, end);
   }
 }
 
+std::array<std::pair<float, float>, 3> get_desired_moves(
+    float x, float y, float dest_x, float dest_y) noexcept {
+  auto result = std::array<std::pair<float, float>, 3>{};
+  result[0] = std::make_pair(dest_x, dest_y);
+  auto diff_x = int(dest_x - x);
+  auto diff_y = int(dest_y - y);
+  if (diff_x == 0 || diff_y == 0) {
+    // Agent wants to walk straight to North, South, West or East
+    result[1] = std::make_pair(dest_x + diff_y, dest_y + diff_x);
+    result[2] = std::make_pair(dest_x - diff_y, dest_y - diff_x);
+  } else {
+    // Agent wants to walk diagonally
+    result[1] = std::make_pair(dest_x, y);
+    result[2] = std::make_pair(x, dest_y);
+  }
+  return result;
+}
+
 void Model::move(std::uint32_t* begin, std::uint32_t* end) {
   float region_begin = agent_soa->xs[*begin];
-  float region_end = agent_soa->ys[*(end - 1)];
-  for(auto iter = begin; iter != end; ++iter){
+  float region_end = agent_soa->xs[*(end - 1)];
+  for (auto iter = begin; iter != end; ++iter) {
     std::uint32_t agent_idx = *iter;
-    float dest_x = agent_soa->dest_xs[agent_idx];
-    float dest_y = agent_soa->desired_ys[agent_idx];
-    printf("%f, %f\n", dest_x, dest_y);
+    float x = agent_soa->xs[agent_idx];
+    float y = agent_soa->ys[agent_idx];
+    float desired_x = agent_soa->desired_xs[agent_idx];
+    float desired_y = agent_soa->desired_ys[agent_idx];
+    auto desired_moves = get_desired_moves(x, y, desired_x, desired_y);
+
+    for (auto move : desired_moves) {
+      float move_x = move.first;
+      float move_y = move.second;
+      bool local_move = move_x >= region_begin && move_x < region_end;
+      if (local_move) {
+        if (state[(int)move_x][(int)move_y] == ~std::uint32_t(0)) {
+          state[(int)move_x][(int)move_y] = agent_idx;
+          state[(int)x][(int)y] = ~std::uint32_t(0);
+          agent_soa->xs[agent_idx] = move_x;
+          agent_soa->ys[agent_idx] = move_y;
+          break;
+        }
+      } else {
+        if (__sync_bool_compare_and_swap(&state[(int)move_x][(int)move_y],
+                                         ~std::uint32_t(0), agent_idx)) {
+          state[(int)x][(int)y] = ~std::uint32_t(0);
+          agent_soa->xs[agent_idx] = move_x;
+          agent_soa->ys[agent_idx] = move_y;
+          break;
+        }
+      }
+    }
   }
 }
 
@@ -250,9 +338,7 @@ void Ped::Model::move(Ped::Tagent* agent) {
     p2 = std::make_pair(pDesired.first - diffY, pDesired.second - diffX);
   } else {
     // Agent wants to walk diagonally
-    p1 = std::make_pair(pDesired.first,
-
-                        agent->getY());
+    p1 = std::make_pair(pDesired.first, agent->getY());
     p2 = std::make_pair(agent->getX(), pDesired.second);
   }
   prioritizedAlternatives.push_back(p1);

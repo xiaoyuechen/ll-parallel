@@ -73,11 +73,14 @@ class Model {
 
   AgentSoa* agent_soa = nullptr;
   AgentIdxArray* agent_idx_array = nullptr;
+  std::uint32_t** state;
 
   // Moves an agent towards its next position
   void move(Ped::Tagent* agent);
 
   void move(std::uint32_t* begin, std::uint32_t* end);
+
+  void ComputeDesiredPos();
 
   ////////////
   /// Everything below here won't be relevant until Assignment 3
@@ -106,5 +109,7 @@ class Model {
   void setupHeatmapSeq();
   void updateHeatmapSeq();
 };
+
 }  // namespace Ped
+
 #endif
