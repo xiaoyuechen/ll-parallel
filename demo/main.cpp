@@ -43,6 +43,7 @@ int main(int argc, char* argv[]) {
   impl_arg_map["thread"] = Ped::IMPLEMENTATION::PTHREAD;
   impl_arg_map["cuda"] = Ped::IMPLEMENTATION::CUDA;
   impl_arg_map["vector"] = Ped::IMPLEMENTATION::VECTOR;
+  impl_arg_map["region"] = Ped::IMPLEMENTATION::REGION;
   auto tick_mode_arg = std::string("tick-mode=");
 
   std::cout << "Running with " << omp_get_max_threads() << " threads"

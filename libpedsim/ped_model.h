@@ -25,7 +25,7 @@ namespace Ped {
 
 // The implementation modes for Assignment 1 + 2:
 // chooses which implementation to use for tick()
-enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ };
+enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ, REGION };
 
 class Model {
  public:
@@ -58,6 +58,7 @@ class Model {
   void tickThread();
   void tickVector();
   void tickCuda();
+  void tickRegion();
 
   // Denotes which implementation (sequential, parallel implementations..)
   // should be used for calculating the desired positions of
@@ -71,9 +72,12 @@ class Model {
   std::vector<Twaypoint*> destinations;
 
   AgentSoa* agent_soa = nullptr;
+  AgentIdxArray* agent_idx_array = nullptr;
 
   // Moves an agent towards its next position
   void move(Ped::Tagent* agent);
+
+  void move(std::uint32_t* begin, std::uint32_t* end);
 
   ////////////
   /// Everything below here won't be relevant until Assignment 3

@@ -17,7 +17,6 @@
 #include <stack>
 #include <thread>
 
-
 #include "cuda_testkernel.h"
 #include "ped_model.h"
 #include "ped_waypoint.h"
@@ -110,7 +109,7 @@ void Ped::Model::tickVector() {
   if (!agent_soa) {
     tickSeq();
     agent_soa = new AgentSoa(agents, AgentSoa::MemType::kAligned);
-    for(std::size_t i = 0; i != agents.size(); ++i) {
+    for (std::size_t i = 0; i != agents.size(); ++i) {
       agents[i]->x_ptr = &agent_soa->xs[i];
       agents[i]->y_ptr = &agent_soa->ys[i];
     }
@@ -151,6 +150,48 @@ void Ped::Model::tickVector() {
   }
 }
 
+void Model::tickRegion() {
+  if (!agent_soa) {
+    tickSeq();
+    agent_soa = new AgentSoa(agents, AgentSoa::MemType::kAligned);
+    for (std::size_t i = 0; i != agents.size(); ++i) {
+      agents[i]->x_ptr = &agent_soa->xs[i];
+      agents[i]->y_ptr = &agent_soa->ys[i];
+    }
+    agent_idx_array = new AgentIdxArray(agents.size());
+  }
+  agent_soa->ComputeNextDestination();
+  SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
+  // for (std::size_t i = 0; i < agents.size(); i++) {
+  //   printf("%u ",agent_idx_array->indice[i]);
+  // }
+  // printf("\n");
+
+#pragma omp parallel
+  {
+    std::size_t region_agent_count =
+        (std::size_t)ceil((double)agents.size() / omp_get_num_threads());
+    int thread_id = omp_get_thread_num();
+    std::uint32_t* begin =
+        agent_idx_array->indice + thread_id * region_agent_count;
+    std::uint32_t* end =
+        agent_idx_array->indice + (thread_id + 1) * region_agent_count;
+    // printf("%u, %u\n", *begin, *end);
+    move(begin, end);
+  }
+}
+
+void Model::move(std::uint32_t* begin, std::uint32_t* end) {
+  float region_begin = agent_soa->xs[*begin];
+  float region_end = agent_soa->ys[*(end - 1)];
+  for(auto iter = begin; iter != end; ++iter){
+    std::uint32_t agent_idx = *iter;
+    float dest_x = agent_soa->dest_xs[agent_idx];
+    float dest_y = agent_soa->desired_ys[agent_idx];
+    printf("%f, %f\n", dest_x, dest_y);
+  }
+}
+
 void Ped::Model::tick() {
   switch (implementation) {
     case IMPLEMENTATION::SEQ:
@@ -167,6 +208,9 @@ void Ped::Model::tick() {
       break;
     case IMPLEMENTATION::CUDA:
       tickCuda();
+      break;
+    case IMPLEMENTATION::REGION:
+      tickRegion();
       break;
   }
 }

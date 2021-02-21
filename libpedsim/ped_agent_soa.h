@@ -71,6 +71,6 @@ struct AgentIdxArray {
   std::uint32_t* indice;
 };
 
-void SortAgents(float* attrib, AgentIdxArray& idx_array);
+void SortAgents(float* attrib, AgentIdxArray& idx_array, std::size_t size);
 
 }  // namespace Ped
