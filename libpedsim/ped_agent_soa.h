@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 #include "ped_agent.h"
@@ -58,6 +59,16 @@ struct AgentSoa {
   float* dest_rs;
   int* current_waypoint_indice;
   const std::vector<Twaypoint>** waypoints;
+};
+
+void* MallocPinned(std::size_t bytes);
+void FreePinned(void* mem);
+
+struct AgentIdxArray {
+  explicit AgentIdxArray(std::size_t size);
+  ~AgentIdxArray();
+
+  std::uint32_t* indexes;
 };
 
 }  // namespace Ped
