@@ -27,6 +27,12 @@ namespace Ped {
 // chooses which implementation to use for tick()
 enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ, REGION };
 
+struct State {
+  std::uint32_t** state;
+  int offset_x;
+  int offset_y;
+};
+
 class Model {
  public:
   // Sets everything up
@@ -73,7 +79,8 @@ class Model {
 
   AgentSoa* agent_soa = nullptr;
   AgentIdxArray* agent_idx_array = nullptr;
-  std::uint32_t** state;
+
+  State state;
 
   // Moves an agent towards its next position
   void move(Ped::Tagent* agent);
@@ -109,6 +116,7 @@ class Model {
   void setupHeatmapSeq();
   void updateHeatmapSeq();
 };
+
 
 }  // namespace Ped
 

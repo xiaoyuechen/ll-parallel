@@ -185,6 +185,14 @@ void Model::ComputeDesiredPos() {
   }
 }
 
+std::uint32_t& cell(State& state, int x, int y) {
+  return state.state[x + state.offset_x][y + state.offset_y];
+}
+
+
+static constexpr std::size_t kStateX = 300;
+static constexpr std::size_t kStateY = 200;
+
 void Model::tickRegion() {
   if (!agent_soa) {
     tickSeq();
@@ -195,16 +203,18 @@ void Model::tickRegion() {
     }
     agent_idx_array = new AgentIdxArray(agents.size());
 
-    state = new std::uint32_t*[200];
-    for (int i = 0; i < 200; ++i) state[i] = new std::uint32_t[200];
-    
-    for (int i = 0; i != 200; ++i)
-      for (int j = 0; j != 200; ++j) state[i][j] = ~std::uint32_t(0);
+    state.offset_x = 50;
+    state.offset_y = 0;
+    state.state = new std::uint32_t*[kStateX];
+    for (int i = 0; i < kStateX; ++i) state.state[i] = new std::uint32_t[kStateY];
+
+    for (int i = 0; i != kStateX; ++i)
+      for (int j = 0; j != kStateY; ++j) state.state[i][j] = ~std::uint32_t(0);
 
     for (std::size_t i = 0; i != agents.size(); ++i) {
       int x = (int)agent_soa->xs[i];
       int y = (int)agent_soa->ys[i];
-      state[x][y] = i;
+      cell(state, x, y) = i;
     }
   }
   SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
@@ -226,20 +236,21 @@ void Model::tickRegion() {
   }
 }
 
-std::array<std::pair<float, float>, 3> get_desired_moves(
-    float x, float y, float dest_x, float dest_y) noexcept {
-  auto result = std::array<std::pair<float, float>, 3>{};
-  result[0] = std::make_pair(dest_x, dest_y);
-  auto diff_x = int(dest_x - x);
-  auto diff_y = int(dest_y - y);
+std::array<std::pair<int, int>, 3> get_desired_moves(int x, int y,
+                                                     int desired_x,
+                                                     int desired_y) noexcept {
+  auto result = std::array<std::pair<int, int>, 3>{};
+  result[0] = std::make_pair(desired_x, desired_y);
+  auto diff_x = desired_x - x;
+  auto diff_y = desired_y - y;
   if (diff_x == 0 || diff_y == 0) {
     // Agent wants to walk straight to North, South, West or East
-    result[1] = std::make_pair(dest_x + diff_y, dest_y + diff_x);
-    result[2] = std::make_pair(dest_x - diff_y, dest_y - diff_x);
+    result[1] = std::make_pair(desired_x + diff_y, desired_y + diff_x);
+    result[2] = std::make_pair(desired_x - diff_y, desired_y - diff_x);
   } else {
     // Agent wants to walk diagonally
-    result[1] = std::make_pair(dest_x, y);
-    result[2] = std::make_pair(x, dest_y);
+    result[1] = std::make_pair(desired_x, y);
+    result[2] = std::make_pair(x, desired_y);
   }
   return result;
 }
@@ -249,28 +260,29 @@ void Model::move(std::uint32_t* begin, std::uint32_t* end) {
   float region_end = agent_soa->xs[*(end - 1)];
   for (auto iter = begin; iter != end; ++iter) {
     std::uint32_t agent_idx = *iter;
-    float x = agent_soa->xs[agent_idx];
-    float y = agent_soa->ys[agent_idx];
-    float desired_x = agent_soa->desired_xs[agent_idx];
-    float desired_y = agent_soa->desired_ys[agent_idx];
+    int x = (int)agent_soa->xs[agent_idx];
+    int y = (int)agent_soa->ys[agent_idx];
+    int desired_x = (int)agent_soa->desired_xs[agent_idx];
+    int desired_y = (int)agent_soa->desired_ys[agent_idx];
     auto desired_moves = get_desired_moves(x, y, desired_x, desired_y);
 
     for (auto move : desired_moves) {
-      float move_x = move.first;
-      float move_y = move.second;
+      int move_x = move.first;
+      int move_y = move.second;
+
       bool local_move = move_x >= region_begin && move_x < region_end;
       if (local_move) {
-        if (state[(int)move_x][(int)move_y] == ~std::uint32_t(0)) {
-          state[(int)move_x][(int)move_y] = agent_idx;
-          state[(int)x][(int)y] = ~std::uint32_t(0);
+        if (cell(state, move_x, move_y) == ~std::uint32_t(0)) {
+          cell(state, move_x, move_y) = agent_idx;
+          cell(state, x, y) = ~std::uint32_t(0);
           agent_soa->xs[agent_idx] = move_x;
           agent_soa->ys[agent_idx] = move_y;
           break;
         }
       } else {
-        if (__sync_bool_compare_and_swap(&state[(int)move_x][(int)move_y],
+        if (__sync_bool_compare_and_swap(&cell(state, move_x, move_y),
                                          ~std::uint32_t(0), agent_idx)) {
-          state[(int)x][(int)y] = ~std::uint32_t(0);
+          cell(state, x, y) = ~std::uint32_t(0);
           agent_soa->xs[agent_idx] = move_x;
           agent_soa->ys[agent_idx] = move_y;
           break;
