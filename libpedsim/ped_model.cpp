@@ -9,11 +9,13 @@
 
 #include <smmintrin.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <iostream>
+#include <random>
 #include <stack>
 #include <thread>
 
@@ -189,7 +191,6 @@ std::uint32_t& cell(State& state, int x, int y) {
   return state.state[x + state.offset_x][y + state.offset_y];
 }
 
-
 static constexpr std::size_t kStateX = 300;
 static constexpr std::size_t kStateY = 200;
 
@@ -206,7 +207,8 @@ void Model::tickRegion() {
     state.offset_x = 50;
     state.offset_y = 0;
     state.state = new std::uint32_t*[kStateX];
-    for (int i = 0; i < kStateX; ++i) state.state[i] = new std::uint32_t[kStateY];
+    for (int i = 0; i < kStateX; ++i)
+      state.state[i] = new std::uint32_t[kStateY];
 
     for (int i = 0; i != kStateX; ++i)
       for (int j = 0; j != kStateY; ++j) state.state[i][j] = ~std::uint32_t(0);
@@ -220,6 +222,7 @@ void Model::tickRegion() {
   SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
   ComputeDesiredPos();
 
+  // usleep(160000);
 #pragma omp parallel
   {
     std::size_t region_agent_count =
@@ -256,8 +259,11 @@ std::array<std::pair<int, int>, 3> get_desired_moves(int x, int y,
 }
 
 void Model::move(std::uint32_t* begin, std::uint32_t* end) {
+  static std::random_device rd;
+  static std::mt19937 g(rd());
   float region_begin = agent_soa->xs[*begin];
   float region_end = agent_soa->xs[*(end - 1)];
+  std::shuffle(begin, end, g);
   for (auto iter = begin; iter != end; ++iter) {
     std::uint32_t agent_idx = *iter;
     int x = (int)agent_soa->xs[agent_idx];
