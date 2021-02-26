@@ -262,7 +262,12 @@ void Model::move(std::uint32_t* begin, std::uint32_t* end) {
   static std::random_device rd;
   static std::mt19937 g(rd());
   float region_begin = agent_soa->xs[*begin];
-  float region_end = agent_soa->xs[*(end - 1)];
+  float region_end;
+  if (end == agent_idx_array->indice + agent_soa->size)
+    region_end = agent_soa->xs[*(end - 1)];
+  else
+    region_end = agent_soa->xs[*end];
+
   std::shuffle(begin, end, g);
   for (auto iter = begin; iter != end; ++iter) {
     std::uint32_t agent_idx = *iter;
@@ -276,7 +281,7 @@ void Model::move(std::uint32_t* begin, std::uint32_t* end) {
       int move_x = move.first;
       int move_y = move.second;
 
-      bool local_move = move_x >= region_begin && move_x < region_end;
+      bool local_move = move_x > region_begin && move_x < region_end;
       if (local_move) {
         if (cell(state, move_x, move_y) == ~std::uint32_t(0)) {
           cell(state, move_x, move_y) = agent_idx;
