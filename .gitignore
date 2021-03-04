@@ -41,5 +41,8 @@
 # binary file
 demo/demo
 
+#idea files
+idea/
+
 # VS code files
 .vscode
