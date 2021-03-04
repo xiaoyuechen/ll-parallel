@@ -7,11 +7,6 @@
 #define BLOCK_WIDTH 256
 
 namespace Ped {
-  __global__ void InitHeatmap(int* hm, int** heatmap) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    heatmap[tid] = hm + SIZE * tid;
-  }
-
   __global__ void InitSBHeatmap(int* bhm, int* shm, int** scaled_heatmap) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     scaled_heatmap[tid] = shm + SCALED_SIZE * tid;
@@ -31,7 +26,6 @@ namespace Ped {
     cudaMalloc(&heatmap, SIZE * sizeof(int*));
     cudaMalloc(&scaled_heatmap, SCALED_SIZE * sizeof(int*));
 
-
     //we need to calculate them on GPU as well?
     cudaMalloc(&desired_xs, 256 * sizeof(int));
     cudaMalloc(&desired_ys, 256 * sizeof(int));
@@ -41,8 +35,6 @@ namespace Ped {
     cudaMemset(shm, 0, SCALED_SIZE * SCALED_SIZE);
     cudaMemset(bhm, 0, SCALED_SIZE * SCALED_SIZE);
 
-    // InitHeatmap<<<1,SIZE>>>(hm, heatmap);
-    // cudaDeviceSynchronize();
     InitSBHeatmap<<<CELLSIZE,SIZE>>>(bhm, shm, scaled_heatmap);
     cudaDeviceSynchronize();
   }
