@@ -113,10 +113,15 @@ class Model {
   // The final heatmap: blurred and scaled to fit the view
   int** blurred_heatmap;
 
+  int* desired_xs;
+  int* desired_ys;
+
   void setupHeatmapSeq();
   void updateHeatmapSeq();
-};
 
+  void setupHeatmapCuda();
+  void updateHeatmapCuda();
+};
 
 }  // namespace Ped
 
