@@ -127,7 +127,6 @@ class Model {
   void updateHeatmapSeq();
 
   void SetupHeatmapCuda();
-  void UpdateHeatmapCuda();
   void ComputeDesiredPosCuda();
 
  public:

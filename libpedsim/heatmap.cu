@@ -13,7 +13,7 @@ __constant__ int kWeightMatrix[5][5];
 
 
 void Model::SetupHeatmapCuda() {
-  cudaMalloc(&hm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+  cudaMallocHost(&hm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
   cudaMemset(hm, 0, SIZE * SIZE * sizeof(int));
   cudaMalloc(&shm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
   cudaMalloc(&bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
@@ -68,9 +68,9 @@ __global__ void ScaleHeatmap(int* hm, int* shm, int ratio, int n) {
       shm[(y * ratio + cy) * n * ratio + x * ratio + cx] = val;
 }
 
+#define WEIGHTSUM 273
 
 __global__ void BlurHeatmap(int* shm, int* bhm, int n) {
-  #define WEIGHTSUM 273
   __shared__ int blk [32][32];
 
   int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -97,40 +97,49 @@ __global__ void BlurHeatmap(int* shm, int* bhm, int n) {
 
 }
 
+  // Weights for blur filter
+  constexpr int w[5][5] = {{1, 4, 7, 4, 1},
+                       {4, 16, 26, 16, 4},
+                       {7, 26, 41, 26, 7},
+                       {4, 16, 26, 16, 4},
+                       {1, 4, 7, 4, 1}};
 
-void Model::UpdateHeatmapCuda() {
-  {
-    dim3 threads_per_block(32, 32);
-    dim3 num_blocks(SIZE / threads_per_block.x, SIZE / threads_per_block.y);
-    FadeHeatmap<<<num_blocks, threads_per_block>>>(hm, SIZE);
+void BlurHeatmapCPU(int* shm, int* bhm){ 
+  // Apply gaussian blurfilter
+  for (int i = 2; i < SCALED_SIZE - 2; i++) {
+    for (int j = 2; j < SCALED_SIZE - 2; j++) {
+      int sum = 0;
+      for (int k = -2; k < 3; k++) {
+        for (int l = -2; l < 3; l++) {
+          sum += w[2 + k][2 + l] * shm[(i + k) * SCALED_SIZE + j + l];
+        }
+      }
+      int value = sum / WEIGHTSUM;
+      bhm[i * SCALED_SIZE + j] = 0x00FF0000 | value << 24;
+    }
   }
-  
-  {
-    std::transform(agent_soa->desired_xs, agent_soa->desired_xs + agent_soa->size, 
-      desired_xs, [](float x){return int(x);});
-    std::transform(agent_soa->desired_ys, agent_soa->desired_ys + agent_soa->size, 
-      desired_ys, [](float x){return int(x);});
-    int threads_per_block = 1024;
-    int num_blocks = (agent_soa->size + threads_per_block - 1) / threads_per_block;
-    IntensifyHeat<<<num_blocks, threads_per_block>>>(desired_xs, desired_ys, hm, agent_soa->size, SIZE);
-  }
+}
 
-  {
-    dim3 threads_per_block(32, 32);
-    dim3 num_blocks(SIZE / threads_per_block.x, SIZE / threads_per_block.y);
-    ScaleHeatmap<<<num_blocks, threads_per_block>>>(hm, shm, CELLSIZE, SIZE);
-  }
-
-  {
-    dim3 threads_per_block(32, 32);
-    dim3 num_blocks(SCALED_SIZE / threads_per_block.x, SCALED_SIZE / threads_per_block.y);
-    BlurHeatmap<<<num_blocks, threads_per_block>>>(shm, bhm, SCALED_SIZE);
-  }
-
-  {
-    cudaMemcpy(h_bhm, bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
+void CreateHeatmapCPU(int* heatmap, AgentSoa* agent_soa) {
+  for (int x = 0; x < SIZE; x++) {
+    for (int y = 0; y < SIZE; y++) {
+      // heat fades
+      heatmap[y * SIZE + x] = (int)round(heatmap[y * SIZE + x] * 0.80);
+    }
   }
 
+  // Count how many agents want to go to each location
+  for (int i = 0; i < agent_soa->size; i++) {
+    int x = agent_soa->desired_xs[i];
+    int y = agent_soa->desired_ys[i];
+
+    if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) {
+      continue;
+    }
+
+    // intensify heat for better color results
+    heatmap[y * SIZE + x] += 40;
+  }
 }
 
 std::uint32_t& cell(State& state, int x, int y) {
@@ -179,30 +188,7 @@ void Model::tickRegion() {
   
   auto cpu_start = std::chrono::high_resolution_clock::now();
 
-  // heatmap creation
-  {
-    cudaEventRecord(start[0], 0);
-
-    // fade heatmap
-    {
-      dim3 threads_per_block(32, 32);
-      dim3 num_blocks(SIZE / threads_per_block.x, SIZE / threads_per_block.y);
-      FadeHeatmap<<<num_blocks, threads_per_block>>>(hm, SIZE);
-    }
-
-    // intensify heatmap
-    {
-      std::transform(agent_soa->desired_xs, agent_soa->desired_xs + agent_soa->size, 
-        desired_xs, [](float x){return int(x);});
-      std::transform(agent_soa->desired_ys, agent_soa->desired_ys + agent_soa->size, 
-        desired_ys, [](float x){return int(x);});
-      int threads_per_block = 1024;
-      int num_blocks = (agent_soa->size + threads_per_block - 1) / threads_per_block;
-      IntensifyHeat<<<num_blocks, threads_per_block>>>(desired_xs, desired_ys, hm, agent_soa->size, SIZE);
-    }
-
-    cudaEventRecord(stop[0], 0);
-  }
+  CreateHeatmapCPU(hm, agent_soa);
 
   // scale heatmap
   {
@@ -217,12 +203,9 @@ void Model::tickRegion() {
 
   // blur heatmap
   {
-    cudaEventRecord(start[2], 0);
-
     dim3 threads_per_block(32, 32);
     dim3 num_blocks(SCALED_SIZE / threads_per_block.x, SCALED_SIZE / threads_per_block.y);
     BlurHeatmap<<<num_blocks, threads_per_block>>>(shm, bhm, SCALED_SIZE);
-
     cudaEventRecord(stop[2], 0);
   }
 
@@ -257,9 +240,9 @@ void Model::tickRegion() {
   }
 
   float gpu_end;
-  cudaEventElapsedTime(&gpu_end, start[0], stop[2]);
+  cudaEventElapsedTime(&gpu_end, start[1], stop[2]);
 
-  imbalance += (gpu_end - cpu_end) / gpu_end;
+  imbalance += (cpu_end - gpu_end) / cpu_end;
 }
 
 }  // namespace Ped
