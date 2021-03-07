@@ -76,15 +76,19 @@ __global__ void BlurHeatmap(int* shm, int* bhm, int n) {
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   blk[threadIdx.y][threadIdx.x] = shm[y * n + x];
-  
   __syncthreads();
-
   if(2 <= x && x < n - 2 && 2 <= y && y < n - 2) {
     int sum = 0;
     for (int k = -2; k < 3; k++) {
       for (int l = -2; l < 3; l++) {
-        // sum += kWeightMatrix[2 + k][2 + l] * blk[threadIdx.y + k][threadIdx.x + l];
-        sum += kWeightMatrix[2 + k][2 + l] * shm[(y + k) * n + x + l];
+        int cy = threadIdx.y + k;
+        int cx = threadIdx.x + l;
+        int v;
+        if(0 <= cy && cy < 32 && 0 <= cx && cx < 32)
+          v = blk[cy][cx];
+        else
+          v = shm[(y + k) * n + x + l];
+        sum += kWeightMatrix[2 + k][2 + l] * v;
       }
     }
     int val = sum / WEIGHTSUM;
