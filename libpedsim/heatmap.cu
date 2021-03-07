@@ -7,10 +7,9 @@
 #define BLOCK_WIDTH 256
 
 namespace Ped {
-  __global__ void InitSBHeatmap(int* bhm, int* shm, int** scaled_heatmap, int** blurred_heatmap) {
+  __global__ void InitSHeatmap(int* bhm, int* shm, int** scaled_heatmap) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     scaled_heatmap[tid] = shm + SCALED_SIZE * tid;
-    blurred_heatmap[tid] = bhm + SCALED_SIZE * tid;
   }
 
   __global__ void InitHeatmap(int* hm, int** heatmap) {
@@ -24,11 +23,10 @@ namespace Ped {
     //     cudaStreamCreate(s + i);
     // }
 
-    int *hm, *shm, *bhm;
+    int *hm, *shm;
     
     cudaMalloc(&hm, SIZE * SIZE * sizeof(int));
     cudaMalloc(&shm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
-    cudaMalloc(&bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
     cudaMalloc(&heatmap, SIZE * sizeof(int*));
     cudaMalloc(&scaled_heatmap, SCALED_SIZE * sizeof(int*));
 
@@ -37,15 +35,19 @@ namespace Ped {
     cudaMalloc(&desired_ys, 256 * sizeof(int));
 
     cudaMallocHost(&blurred_heatmap, SCALED_SIZE * sizeof(int*));
+    cudaMallocHost(&bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
     cudaMemset(hm, 0, SIZE * SIZE);
     cudaMemset(shm, 0, SCALED_SIZE * SCALED_SIZE);
-    cudaMemset(bhm, 0, SCALED_SIZE * SCALED_SIZE);
 
-    InitHeatmap<<<1,SIZE>>>(hm. heatmap);
+    InitHeatmap<<<1,SIZE>>>(hm, heatmap);
     cudaDeviceSynchronize();
 
-    InitSBHeatmap<<<CELLSIZE,SIZE>>>(bhm, shm, scaled_heatmap, blurred_heatmap);
+    InitSHeatmap<<<CELLSIZE,SIZE>>>(bhm, shm, scaled_heatmap);
+    cudaDeviceSynchronize();
 
+    for (int i = 0; i < SCALED_SIZE; i++) {
+      blurred_heatmap[i] = bhm + SCALED_SIZE * i;
+    }
   }
 
 
@@ -66,32 +68,32 @@ namespace Ped {
   }
 
   void Model::updateHeatmapCuda() {
-    float time1, time2, time3;
-    cudaEvent_t fade_start, fade_stop;
-    cudaEventCreate(&fade_start);
-    cudaEventCreate(&fade_stop);
-    cudaEventRecord(fade_start, 0);
+    // float time1, time2, time3;
+    // cudaEvent_t fade_start, fade_stop;
+    // cudaEventCreate(&fade_start);
+    // cudaEventCreate(&fade_stop);
+    // cudaEventRecord(fade_start, 0);
   
-    heatFades<<<1, SIZE>>>(*heatmap);
+    // heatFades<<<1, SIZE>>>(*heatmap);
     
-    cudaEventRecord(fade_stop, 0);
-    cudaEventSynchronize(fade_stop);
-    cudaEventElapsedTime(&time1, fade_start, fade_stop);
-    cudaEventDestroy(fade_start);
-    cudaEventDestroy(fade_stop);
+    // cudaEventRecord(fade_stop, 0);
+    // cudaEventSynchronize(fade_stop);
+    // cudaEventElapsedTime(&time1, fade_start, fade_stop);
+    // cudaEventDestroy(fade_start);
+    // cudaEventDestroy(fade_stop);
 
-    cudaEvent_t coloring_start, coloring_stop;
-    cudaEventCreate(&coloring_start);
-    cudaEventCreate(&coloring_stop);
-    cudaEventRecord(coloring_start, 0);
+    // cudaEvent_t coloring_start, coloring_stop;
+    // cudaEventCreate(&coloring_start);
+    // cudaEventCreate(&coloring_stop);
+    // cudaEventRecord(coloring_start, 0);
   
-    coloringTheMap<<<1, SIZE>>>(*heatmap, agents.size(), desired_xs, desired_ys);
+    // coloringTheMap<<<1, SIZE>>>(*heatmap, agents.size(), desired_xs, desired_ys);
     
-    cudaEventRecord(coloring_stop, 0);
-    cudaEventSynchronize(coloring_stop);
-    cudaEventElapsedTime(&time2, coloring_start, coloring_stop);
-    cudaEventDestroy(coloring_start);
-    cudaEventDestroy(coloring_stop);
+    // cudaEventRecord(coloring_stop, 0);
+    // cudaEventSynchronize(coloring_stop);
+    // cudaEventElapsedTime(&time2, coloring_start, coloring_stop);
+    // cudaEventDestroy(coloring_start);
+    // cudaEventDestroy(coloring_stop);
 
     //need another gaussian filtering cuda kernel
   }
