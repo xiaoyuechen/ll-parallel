@@ -13,6 +13,7 @@
 
 #include <omp.h>
 
+#include <chrono>
 #include <map>
 #include <set>
 #include <thread>
@@ -128,6 +129,12 @@ class Model {
   void SetupHeatmapCuda();
   void UpdateHeatmapCuda();
   void ComputeDesiredPosCuda();
+
+ public:
+  float heatmap_creation_time = 0.0f;
+  float heatmap_scaling_time = 0.0f;
+  float heatmap_blurring_time = 0.0f;
+  float imbalance = 0.0f;
 };
 
 std::uint32_t& cell(State& state, int x, int y);

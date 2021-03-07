@@ -169,45 +169,64 @@ void Model::tickRegion() {
   }
   //////// end of init ////////
 
-  // fade heatmap
-  {
-    dim3 threads_per_block(32, 32);
-    dim3 num_blocks(SIZE / threads_per_block.x, SIZE / threads_per_block.y);
-    FadeHeatmap<<<num_blocks, threads_per_block>>>(hm, SIZE);
-  }
-
-  SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
   ComputeDesiredPos();
+  
+  cudaEvent_t start[3], stop[3];
+  for(int i = 0; i != 3; ++i) {
+    cudaEventCreate(&start[i]);
+    cudaEventCreate(&stop[i]);
+  }
+  
+  auto cpu_start = std::chrono::high_resolution_clock::now();
 
-  // intensify heatmap
+  // heatmap creation
   {
-    std::transform(agent_soa->desired_xs, agent_soa->desired_xs + agent_soa->size, 
-      desired_xs, [](float x){return int(x);});
-    std::transform(agent_soa->desired_ys, agent_soa->desired_ys + agent_soa->size, 
-      desired_ys, [](float x){return int(x);});
-    int threads_per_block = 1024;
-    int num_blocks = (agent_soa->size + threads_per_block - 1) / threads_per_block;
-    IntensifyHeat<<<num_blocks, threads_per_block>>>(desired_xs, desired_ys, hm, agent_soa->size, SIZE);
+    cudaEventRecord(start[0], 0);
+
+    // fade heatmap
+    {
+      dim3 threads_per_block(32, 32);
+      dim3 num_blocks(SIZE / threads_per_block.x, SIZE / threads_per_block.y);
+      FadeHeatmap<<<num_blocks, threads_per_block>>>(hm, SIZE);
+    }
+
+    // intensify heatmap
+    {
+      std::transform(agent_soa->desired_xs, agent_soa->desired_xs + agent_soa->size, 
+        desired_xs, [](float x){return int(x);});
+      std::transform(agent_soa->desired_ys, agent_soa->desired_ys + agent_soa->size, 
+        desired_ys, [](float x){return int(x);});
+      int threads_per_block = 1024;
+      int num_blocks = (agent_soa->size + threads_per_block - 1) / threads_per_block;
+      IntensifyHeat<<<num_blocks, threads_per_block>>>(desired_xs, desired_ys, hm, agent_soa->size, SIZE);
+    }
+
+    cudaEventRecord(stop[0], 0);
   }
 
   // scale heatmap
   {
+    cudaEventRecord(start[1], 0);
+
     dim3 threads_per_block(32, 32);
     dim3 num_blocks(SIZE / threads_per_block.x, SIZE / threads_per_block.y);
     ScaleHeatmap<<<num_blocks, threads_per_block>>>(hm, shm, CELLSIZE, SIZE);
+
+    cudaEventRecord(stop[1], 0);
   }
 
   // blur heatmap
   {
+    cudaEventRecord(start[2], 0);
+
     dim3 threads_per_block(32, 32);
     dim3 num_blocks(SCALED_SIZE / threads_per_block.x, SCALED_SIZE / threads_per_block.y);
     BlurHeatmap<<<num_blocks, threads_per_block>>>(shm, bhm, SCALED_SIZE);
+
+    cudaEventRecord(stop[2], 0);
   }
 
-  {
-    cudaMemcpy(h_bhm, bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
-  }
-
+  SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
 #pragma omp parallel
   {
     std::size_t region_agent_count =
@@ -222,6 +241,25 @@ void Model::tickRegion() {
     // printf("%u, %u\n", *begin, *end);
     move(begin, end);
   }
+
+  auto cpu_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::high_resolution_clock::now() - cpu_start);
+  float cpu_end = cpu_duration.count() / 1000;
+
+  cudaMemcpy(h_bhm, bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
+
+  cudaEventSynchronize(stop[2]);
+  float* times[] = {&heatmap_creation_time, &heatmap_scaling_time, &heatmap_blurring_time};
+  for(int i = 0; i < 3; ++i) {
+    float duration;
+    cudaEventElapsedTime(&duration, start[i], stop[i]);
+    *times[i] += duration;
+  }
+
+  float gpu_end;
+  cudaEventElapsedTime(&gpu_end, start[0], stop[2]);
+
+  imbalance += (gpu_end - cpu_end) / gpu_end;
 }
 
 }  // namespace Ped

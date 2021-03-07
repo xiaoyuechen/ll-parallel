@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     MainWindow mainwindow(model);
 
     // Default number of steps to simulate. Feel free to change this.
-    const int maxNumberOfStepsToSimulate = 100000;
+    const int maxNumberOfStepsToSimulate = 1000;
 
     // Timing version
     // Run twice, without the gui, to compare the runtimes.
@@ -99,23 +99,24 @@ int main(int argc, char* argv[]) {
       // Run sequentially
 
       double fps_seq, fps_target;
-      {
-        Ped::Model model;
-        ParseScenario parser(scenefile);
-        model.setup(parser.getAgents(), parser.getWaypoints(), Ped::SEQ);
-        PedSimulation simulation(model, mainwindow);
-        // Simulation mode to use when profiling (without any GUI)
-        std::cout << "Running reference version...\n";
-        auto start = std::chrono::steady_clock::now();
-        simulation.runSimulationWithoutQt(maxNumberOfStepsToSimulate);
-        auto duration_seq =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - start);
-        fps_seq = ((float)simulation.getTickCount()) /
-                  ((float)duration_seq.count()) * 1000.0;
-        cout << "Reference time: " << duration_seq.count() << " milliseconds, "
-             << fps_seq << " Frames Per Second." << std::endl;
-      }
+      // {
+      //   Ped::Model model;
+      //   ParseScenario parser(scenefile);
+      //   model.setup(parser.getAgents(), parser.getWaypoints(), Ped::SEQ);
+      //   PedSimulation simulation(model, mainwindow);
+      //   // Simulation mode to use when profiling (without any GUI)
+      //   std::cout << "Running reference version...\n";
+      //   auto start = std::chrono::steady_clock::now();
+      //   simulation.runSimulationWithoutQt(maxNumberOfStepsToSimulate);
+      //   auto duration_seq =
+      //       std::chrono::duration_cast<std::chrono::milliseconds>(
+      //           std::chrono::steady_clock::now() - start);
+      //   fps_seq = ((float)simulation.getTickCount()) /
+      //             ((float)duration_seq.count()) * 1000.0;
+      //   cout << "Reference time: " << duration_seq.count() << " milliseconds,
+      //   "
+      //        << fps_seq << " Frames Per Second." << std::endl;
+      // }
 
       // Change this variable when testing different versions of your code.
       // May need modification or extension in later assignments depending on
@@ -138,6 +139,14 @@ int main(int argc, char* argv[]) {
                      ((float)duration_target.count()) * 1000.0;
         cout << "Target time: " << duration_target.count() << " milliseconds, "
              << fps_target << " Frames Per Second." << std::endl;
+
+        if (impl == Ped::IMPLEMENTATION::REGION) {
+          printf("Heatmap creation time: %f\n", model.heatmap_creation_time);
+          printf("Heatmap scaling time: %f\n", model.heatmap_scaling_time);
+          printf("Heatmap blurring time: %f\n", model.heatmap_blurring_time);
+          printf("Imbalance: %f\n",
+                 model.imbalance / simulation.getTickCount());
+        }
       }
       std::cout << "\n\nSpeedup: " << fps_target / fps_seq << std::endl;
 
