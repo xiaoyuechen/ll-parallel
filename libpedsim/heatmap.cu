@@ -23,7 +23,7 @@ namespace Ped {
     //     cudaStreamCreate(s + i);
     // }
 
-    int *hm, *shm;
+    int *hm, *shm, *bhm;
     
     cudaMalloc(&hm, SIZE * SIZE * sizeof(int));
     cudaMalloc(&shm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
