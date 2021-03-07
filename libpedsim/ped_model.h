@@ -113,6 +113,8 @@ class Model {
   // The final heatmap: blurred and scaled to fit the view
   int** blurred_heatmap;
 
+  int** filter;
+
   int* desired_xs;
   int* desired_ys;
 
