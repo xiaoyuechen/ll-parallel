@@ -130,6 +130,8 @@ class Model {
   void ComputeDesiredPosCuda();
 };
 
+std::uint32_t& cell(State& state, int x, int y);
+
 }  // namespace Ped
 
 #endif

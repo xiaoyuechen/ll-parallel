@@ -191,59 +191,6 @@ void Model::ComputeDesiredPos() {
   }
 }
 
-std::uint32_t& cell(State& state, int x, int y) {
-  return state.state[x + state.offset_x][y + state.offset_y];
-}
-
-static constexpr std::size_t kStateX = 300;
-static constexpr std::size_t kStateY = 200;
-
-void Model::tickRegion() {
-  if (!agent_soa) {
-    for (auto agent : agents) {
-      agent->computeNextDesiredPosition();
-    }
-    agent_soa = new AgentSoa(agents, AgentSoa::MemType::kAligned);
-    for (std::size_t i = 0; i != agents.size(); ++i) {
-      agents[i]->x_ptr = &agent_soa->xs[i];
-      agents[i]->y_ptr = &agent_soa->ys[i];
-    }
-    agent_idx_array = new AgentIdxArray(agents.size());
-
-    state.offset_x = 50;
-    state.offset_y = 0;
-    state.state = new std::uint32_t*[kStateX];
-    for (int i = 0; i < kStateX; ++i)
-      state.state[i] = new std::uint32_t[kStateY];
-
-    for (int i = 0; i != kStateX; ++i)
-      for (int j = 0; j != kStateY; ++j) state.state[i][j] = ~std::uint32_t(0);
-
-    for (std::size_t i = 0; i != agents.size(); ++i) {
-      int x = (int)agent_soa->xs[i];
-      int y = (int)agent_soa->ys[i];
-      cell(state, x, y) = i;
-    }
-  }
-  SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
-  ComputeDesiredPos();
-  UpdateHeatmapCuda();
-#pragma omp parallel
-  {
-    std::size_t region_agent_count =
-        (std::size_t)ceil((double)agents.size() / omp_get_num_threads());
-    int thread_id = omp_get_thread_num();
-    std::uint32_t* begin =
-        agent_idx_array->indice + thread_id * region_agent_count;
-    std::uint32_t* end =
-        agent_idx_array->indice + (thread_id + 1) * region_agent_count;
-    if (end > agent_idx_array->indice + agent_soa->size)
-      end = agent_idx_array->indice + agent_soa->size;
-    // printf("%u, %u\n", *begin, *end);
-    move(begin, end);
-  }
-}
-
 std::array<std::pair<int, int>, 3> get_desired_moves(int x, int y,
                                                      int desired_x,
                                                      int desired_y) noexcept {
