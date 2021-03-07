@@ -43,8 +43,10 @@ void Ped::Model::setup(std::vector<Ped::Tagent*> agentsInScenario,
   this->implementation = implementation;
 
   // Set up heatmap (relevant for Assignment 4)
-  //setupHeatmapSeq();
-  Model::setupHeatmapCuda();
+  if (implementation == IMPLEMENTATION::REGION)
+    SetupHeatmapCuda();
+  else
+    setupHeatmapSeq();
 }
 
 namespace {
@@ -69,7 +71,7 @@ void Ped::Model::tickSeq() {
     agent->computeNextDesiredPosition();
     move(agent);
   }
-  //updateHeatmapSeq();
+  updateHeatmapSeq();
 }
 
 void Ped::Model::tickOmp() {
@@ -198,7 +200,9 @@ static constexpr std::size_t kStateY = 200;
 
 void Model::tickRegion() {
   if (!agent_soa) {
-    tickSeq();
+    for (auto agent : agents) {
+      agent->computeNextDesiredPosition();
+    }
     agent_soa = new AgentSoa(agents, AgentSoa::MemType::kAligned);
     for (std::size_t i = 0; i != agents.size(); ++i) {
       agents[i]->x_ptr = &agent_soa->xs[i];
@@ -223,8 +227,7 @@ void Model::tickRegion() {
   }
   SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
   ComputeDesiredPos();
-  Model::updateHeatmapCuda();
-  // usleep(160000);
+  UpdateHeatmapCuda();
 #pragma omp parallel
   {
     std::size_t region_agent_count =

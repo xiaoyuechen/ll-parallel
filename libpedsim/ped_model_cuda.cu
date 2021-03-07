@@ -17,6 +17,8 @@ __global__ void updateAgentPos(int size, float* xs, float* ys, float* dest_xs,
     }
 }
 
+
+
 void Model::tickCuda() {
     if (!agent_soa) {
         tickSeq();
@@ -38,6 +40,32 @@ void Model::tickCuda() {
         agent_soa->dest_xs,
         agent_soa->dest_ys,
         agent_soa->dest_rs
+    );
+}
+
+__global__ void updateDesiredPos(int size, float* xs, float* ys, float* dest_xs,
+    float* dest_ys, float* dest_rs, float* desired_xs, float* desired_ys) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        float diff_x = dest_xs[idx] - xs[idx];
+        float diff_y = dest_ys[idx] - ys[idx];
+        float len = sqrtf(diff_x * diff_x + diff_y * diff_y);
+        desired_xs[idx] = llrintf(xs[idx] + diff_x / len);
+        desired_ys[idx] = llrintf(ys[idx] + diff_y / len);
+    }
+}
+
+void Model::ComputeDesiredPosCuda() {
+    int num_blocks = (agent_soa->size + 1023)/1024;
+    updateDesiredPos<<<num_blocks, 1024>>>(
+        agent_soa->size,
+        agent_soa->xs,
+        agent_soa->ys,
+        agent_soa->dest_xs,
+        agent_soa->dest_ys,
+        agent_soa->dest_rs,
+        agent_soa->desired_xs,
+        agent_soa->desired_ys
     );
 }
 

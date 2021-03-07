@@ -18,6 +18,7 @@ struct AgentSoa {
     kNone,
     kAligned,
     kPinned,
+    kUnified,
   };
 
   AgentSoa() = default;
@@ -63,6 +64,8 @@ struct AgentSoa {
 
 void* MallocPinned(std::size_t bytes);
 void FreePinned(void* mem);
+void* MallocUnified(std::size_t bytes);
+void FreeUnified(void* mem);
 
 struct AgentIdxArray {
   explicit AgentIdxArray(std::size_t size);

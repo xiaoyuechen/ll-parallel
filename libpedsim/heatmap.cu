@@ -1,101 +1,133 @@
-#include <memory>
 #include <cuda_runtime.h>
-#include "ped_model.h"
 #include <stdio.h>
 
-#define BLOCK_NUMBER 4
-#define BLOCK_WIDTH 256
+#include <memory>
+#include <algorithm>
+
+#include "ped_model.h"
+
 
 namespace Ped {
-  __global__ void InitSHeatmap(int* bhm, int* shm, int** scaled_heatmap) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    scaled_heatmap[tid] = shm + SCALED_SIZE * tid;
+
+__constant__ int kWeightMatrix[5][5];
+
+
+void Model::SetupHeatmapCuda() {
+  cudaMalloc(&hm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+  cudaMemset(hm, 0, SIZE * SIZE * sizeof(int));
+  cudaMalloc(&shm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+  cudaMalloc(&bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+  
+  cudaMallocHost(&desired_xs, agents.size() * sizeof(int));
+  cudaMallocHost(&desired_ys, agents.size() * sizeof(int));
+  
+  const int w[5][5] = 
+  {{1, 4, 7, 4, 1},
+  {4, 16, 26, 16, 4},
+  {7, 26, 41, 26, 7},
+  {4, 16, 26, 16, 4},
+  {1, 4, 7, 4, 1}};
+  
+  cudaMemcpyToSymbol(kWeightMatrix, w, 5*5*sizeof(int));
+  
+  cudaMallocHost(&h_bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+  blurred_heatmap = (int**)malloc(SCALED_SIZE * sizeof(int*));
+  for (int i = 0; i < SCALED_SIZE; i++) {
+    blurred_heatmap[i] = h_bhm + SCALED_SIZE * i;
   }
+}
 
-  __global__ void InitHeatmap(int* hm, int** heatmap) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    heatmap[tid] = hm + SIZE * tid;
-  }
+__global__ void FadeHeatmap(int* hm, int n) {
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  hm[y * n + x] = (int)round(hm[y * n + x] * 0.80);
+}
 
-  void Model::setupHeatmapCuda() {
-    // cudaStream_t s[6];
-    // for(int i = 0; i != 6; ++i) {
-    //     cudaStreamCreate(s + i);
-    // }
-
-    int *hm, *shm, *bhm;
-    
-    cudaMalloc(&hm, SIZE * SIZE * sizeof(int));
-    cudaMalloc(&shm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
-    cudaMalloc(&heatmap, SIZE * sizeof(int*));
-    cudaMalloc(&scaled_heatmap, SCALED_SIZE * sizeof(int*));
-
-    //we need to calculate them on GPU as well?
-    cudaMalloc(&desired_xs, 256 * sizeof(int));
-    cudaMalloc(&desired_ys, 256 * sizeof(int));
-
-    cudaMallocHost(&blurred_heatmap, SCALED_SIZE * sizeof(int*));
-    cudaMallocHost(&bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
-    cudaMemset(hm, 0, SIZE * SIZE);
-    cudaMemset(shm, 0, SCALED_SIZE * SCALED_SIZE);
-
-    InitHeatmap<<<1,SIZE>>>(hm, heatmap);
-    cudaDeviceSynchronize();
-
-    InitSHeatmap<<<CELLSIZE,SIZE>>>(bhm, shm, scaled_heatmap);
-    cudaDeviceSynchronize();
-
-    for (int i = 0; i < SCALED_SIZE; i++) {
-      blurred_heatmap[i] = bhm + SCALED_SIZE * i;
+__global__ void IntensifyHeat(
+  const int* desired_xs, 
+  const int* desired_ys, 
+  int* hm, 
+  int agents_count,
+  int n) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if(idx < agents_count) {
+    int offset = desired_ys[idx] * n + desired_xs[idx];
+    atomicAdd(hm + offset, 40);
+    if(hm[offset] > 255) {
+      hm[offset] = 255;
     }
   }
+}
+
+__global__ void ScaleHeatmap(int* hm, int* shm, int ratio, int n) {
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  int val = hm[y * n + x];
+  for(int cy = 0; cy < ratio; ++cy)
+    for(int cx = 0; cx < ratio; ++cx)
+      shm[(y * ratio + cy) * n * ratio + x * ratio + cx] = val;
+}
 
 
-  __global__ void heatFades(int* heatmap) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    for (int row = 0; row < SIZE; row++) {
-      heatmap[row * SIZE + tid] = (int)round(heatmap[row * SIZE + tid] * 0.80);
+__global__ void BlurHeatmap(int* shm, int* bhm, int n) {
+  #define WEIGHTSUM 273
+  __shared__ int blk [32][32];
+
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  blk[threadIdx.y][threadIdx.x] = shm[y * n + x];
+  
+  __syncthreads();
+
+  if(2 <= x && x < n - 2 && 2 <= y && y < n - 2) {
+    int sum = 0;
+    for (int k = -2; k < 3; k++) {
+      for (int l = -2; l < 3; l++) {
+        // sum += kWeightMatrix[2 + k][2 + l] * blk[threadIdx.y + k][threadIdx.x + l];
+        sum += kWeightMatrix[2 + k][2 + l] * shm[(y + k) * n + x + l];
+      }
     }
+    int val = sum / WEIGHTSUM;
+    bhm[y * n + x] = 0x00FF0000 | val << 24;
   }
 
-  __global__ void coloringTheMap(int* heatmap, const int agents, int* desired_xs, int* desired_ys) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid > agents) return;
-    if(desired_xs[tid]<0||desired_xs[tid]>=SIZE||desired_ys[tid]<0||desired_xs[tid]>=SIZE) return;
+}
 
-    atomicAdd(heatmap + desired_ys[tid] * SIZE + desired_xs[tid], 40);
-	  atomicMin(heatmap + desired_ys[tid] * SIZE + desired_xs[tid], 255);
+
+
+void Model::UpdateHeatmapCuda() {
+  {
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks(SIZE / threads_per_block.x, SIZE / threads_per_block.y);
+    FadeHeatmap<<<num_blocks, threads_per_block>>>(hm, SIZE);
   }
-
-  void Model::updateHeatmapCuda() {
-    // float time1, time2, time3;
-    // cudaEvent_t fade_start, fade_stop;
-    // cudaEventCreate(&fade_start);
-    // cudaEventCreate(&fade_stop);
-    // cudaEventRecord(fade_start, 0);
   
-    // heatFades<<<1, SIZE>>>(*heatmap);
-    
-    // cudaEventRecord(fade_stop, 0);
-    // cudaEventSynchronize(fade_stop);
-    // cudaEventElapsedTime(&time1, fade_start, fade_stop);
-    // cudaEventDestroy(fade_start);
-    // cudaEventDestroy(fade_stop);
-
-    // cudaEvent_t coloring_start, coloring_stop;
-    // cudaEventCreate(&coloring_start);
-    // cudaEventCreate(&coloring_stop);
-    // cudaEventRecord(coloring_start, 0);
-  
-    // coloringTheMap<<<1, SIZE>>>(*heatmap, agents.size(), desired_xs, desired_ys);
-    
-    // cudaEventRecord(coloring_stop, 0);
-    // cudaEventSynchronize(coloring_stop);
-    // cudaEventElapsedTime(&time2, coloring_start, coloring_stop);
-    // cudaEventDestroy(coloring_start);
-    // cudaEventDestroy(coloring_stop);
-
-    //need another gaussian filtering cuda kernel
+  {
+    std::transform(agent_soa->desired_xs, agent_soa->desired_xs + agent_soa->size, 
+      desired_xs, [](float x){return int(x);});
+    std::transform(agent_soa->desired_ys, agent_soa->desired_ys + agent_soa->size, 
+      desired_ys, [](float x){return int(x);});
+    int threads_per_block = 1024;
+    int num_blocks = (agent_soa->size + threads_per_block - 1) / threads_per_block;
+    IntensifyHeat<<<num_blocks, threads_per_block>>>(desired_xs, desired_ys, hm, agent_soa->size, SIZE);
   }
+
+  {
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks(SIZE / threads_per_block.x, SIZE / threads_per_block.y);
+    ScaleHeatmap<<<num_blocks, threads_per_block>>>(hm, shm, CELLSIZE, SIZE);
+  }
+
+  {
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks(SCALED_SIZE / threads_per_block.x, SCALED_SIZE / threads_per_block.y);
+    BlurHeatmap<<<num_blocks, threads_per_block>>>(shm, bhm, SCALED_SIZE);
+  }
+
+  {
+    cudaMemcpy(h_bhm, bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
+  }
+
+}
 
 }  // namespace Ped

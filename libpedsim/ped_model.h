@@ -56,6 +56,7 @@ class Model {
 
   // Returns the heatmap visualizing the density of agents
   int const* const* getHeatmap() const { return blurred_heatmap; };
+
   int getHeatmapSize() const;
 
  private:
@@ -110,17 +111,23 @@ class Model {
   // The scaled heatmap that fits to the view
   int** scaled_heatmap;
 
-  // The final heatmap: blurred and scaled to fit the view
-  int** blurred_heatmap;
-
   int* desired_xs;
   int* desired_ys;
+
+  int* hm;
+  int* shm;
+  int* bhm;
+  int* h_bhm;
+
+  // The final heatmap: blurred and scaled to fit the view
+  int** blurred_heatmap;
 
   void setupHeatmapSeq();
   void updateHeatmapSeq();
 
-  void setupHeatmapCuda();
-  void updateHeatmapCuda();
+  void SetupHeatmapCuda();
+  void UpdateHeatmapCuda();
+  void ComputeDesiredPosCuda();
 };
 
 }  // namespace Ped
