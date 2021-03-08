@@ -177,8 +177,6 @@ void Model::tickRegion() {
     }
   }
   //////// end of init ////////
-
-  ComputeDesiredPos();
   
   cudaEvent_t start[3], stop[3];
   for(int i = 0; i != 3; ++i) {
@@ -209,6 +207,11 @@ void Model::tickRegion() {
     cudaEventRecord(stop[2], 0);
   }
 
+  ComputeDesiredPos();
+  std::transform(agent_soa->desired_xs, agent_soa->desired_xs + agent_soa->size, 
+    desired_xs, [](float x){return int(x);});
+  std::transform(agent_soa->desired_ys, agent_soa->desired_ys + agent_soa->size, 
+    desired_ys, [](float x){return int(x);});
   SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
 #pragma omp parallel
   {
