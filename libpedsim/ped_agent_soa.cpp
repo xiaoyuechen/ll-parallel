@@ -15,8 +15,10 @@ AgentSoa::AgentSoa(const std::vector<Tagent*>& agents, MemType mem_type) {
   void* (*allocate_func)(std::size_t);
   if (mem_type == MemType::kAligned)
     allocate_func = &MallocAligned;
-  else
+  else if (mem_type == MemType::kPinned)
     allocate_func = &MallocPinned;
+  else if (mem_type == MemType::kUnified)
+    allocate_func = &MallocUnified;
 
   size = agents.size();
   int alloc_size = ((agents.size() + 3) / 4) * 4;
@@ -72,6 +74,8 @@ AgentSoa::~AgentSoa() {
     free = &_mm_free;
   else if (mem_type == MemType::kPinned)
     free = &FreePinned;
+  else if (mem_type == MemType::kUnified)
+    free = &FreeUnified;
 
   float* arrs[] = {xs, ys, desired_xs, desired_ys};
   for (auto arr : arrs) {

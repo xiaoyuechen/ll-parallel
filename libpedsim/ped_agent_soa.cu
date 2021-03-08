@@ -16,4 +16,14 @@ void FreePinned(void* mem) {
   cudaFreeHost(mem);
 }
 
+void* MallocUnified(std::size_t bytes) {
+  void* result;
+  cudaMallocManaged(&result, bytes);
+  return result;
+}
+
+void FreeUnified(void* mem) {
+  // cudaFree(mem);
+}
+
 }  // namespace Ped

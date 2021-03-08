@@ -13,6 +13,7 @@
 
 #include <omp.h>
 
+#include <chrono>
 #include <map>
 #include <set>
 #include <thread>
@@ -56,6 +57,7 @@ class Model {
 
   // Returns the heatmap visualizing the density of agents
   int const* const* getHeatmap() const { return blurred_heatmap; };
+
   int getHeatmapSize() const;
 
  private:
@@ -110,20 +112,36 @@ class Model {
   // The scaled heatmap that fits to the view
   int** scaled_heatmap;
 
-  // The final heatmap: blurred and scaled to fit the view
-  int** blurred_heatmap;
-
-  int** filter;
-
   int* desired_xs;
   int* desired_ys;
+
+  int* hm;
+  int* shm;
+  int* bhm;
+  int* h_bhm;
+
+  // The final heatmap: blurred and scaled to fit the view
+  int** blurred_heatmap;
 
   void setupHeatmapSeq();
   void updateHeatmapSeq();
 
-  void setupHeatmapCuda();
-  void updateHeatmapCuda();
+  void SetupHeatmapCuda();
+  void ComputeDesiredPosCuda();
+
+ public:
+  float seq_heatmap_creation_time = 0.0f;
+  float seq_heatmap_creation_tick_time = 0.0f;
+  float seq_heatmap_scaling_time = 0.0f;
+  float seq_heatmap_blurring_time = 0.0f;
+
+  float heatmap_creation_time = 0.0f;
+  float heatmap_scaling_time = 0.0f;
+  float heatmap_blurring_time = 0.0f;
+  float imbalance = 0.0f;
 };
+
+std::uint32_t& cell(State& state, int x, int y);
 
 }  // namespace Ped
 

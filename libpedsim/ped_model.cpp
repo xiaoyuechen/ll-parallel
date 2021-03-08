@@ -43,14 +43,10 @@ void Ped::Model::setup(std::vector<Ped::Tagent*> agentsInScenario,
   this->implementation = implementation;
 
   // Set up heatmap (relevant for Assignment 4)
-  switch (implementation) {
-    case Ped::IMPLEMENTATION::SEQ:
-      setupHeatmapSeq();
-      break;
-    default:
-      setupHeatmapCuda();
-      break;
-  }
+  if (implementation == IMPLEMENTATION::REGION)
+    SetupHeatmapCuda();
+  else
+    setupHeatmapSeq();
 }
 
 namespace {
@@ -192,61 +188,6 @@ void Model::ComputeDesiredPos() {
                              (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
     _mm_store_ps(&agent_soa->desired_xs[stride], desired_x);
     _mm_store_ps(&agent_soa->desired_ys[stride], desired_y);
-  }
-}
-
-std::uint32_t& cell(State& state, int x, int y) {
-  return state.state[x + state.offset_x][y + state.offset_y];
-}
-
-static constexpr std::size_t kStateX = 300;
-static constexpr std::size_t kStateY = 200;
-
-void Model::tickRegion() {
-  if (!agent_soa) {
-    for (auto agent : agents) {
-    agent->computeNextDesiredPosition();
-    move(agent);
-    }
-    agent_soa = new AgentSoa(agents, AgentSoa::MemType::kAligned);
-    for (std::size_t i = 0; i != agents.size(); ++i) {
-      agents[i]->x_ptr = &agent_soa->xs[i];
-      agents[i]->y_ptr = &agent_soa->ys[i];
-    }
-    agent_idx_array = new AgentIdxArray(agents.size());
-
-    state.offset_x = 50;
-    state.offset_y = 0;
-    state.state = new std::uint32_t*[kStateX];
-    for (int i = 0; i < kStateX; ++i)
-      state.state[i] = new std::uint32_t[kStateY];
-
-    for (int i = 0; i != kStateX; ++i)
-      for (int j = 0; j != kStateY; ++j) state.state[i][j] = ~std::uint32_t(0);
-
-    for (std::size_t i = 0; i != agents.size(); ++i) {
-      int x = (int)agent_soa->xs[i];
-      int y = (int)agent_soa->ys[i];
-      cell(state, x, y) = i;
-    }
-  }
-  SortAgents(agent_soa->xs, *agent_idx_array, agents.size());
-  ComputeDesiredPos();
-  updateHeatmapCuda();
-
-#pragma omp parallel
-  {
-    std::size_t region_agent_count =
-        (std::size_t)ceil((double)agents.size() / omp_get_num_threads());
-    int thread_id = omp_get_thread_num();
-    std::uint32_t* begin =
-        agent_idx_array->indice + thread_id * region_agent_count;
-    std::uint32_t* end =
-        agent_idx_array->indice + (thread_id + 1) * region_agent_count;
-    if (end > agent_idx_array->indice + agent_soa->size)
-      end = agent_idx_array->indice + agent_soa->size;
-    // printf("%u, %u\n", *begin, *end);
-    move(begin, end);
   }
 }
 

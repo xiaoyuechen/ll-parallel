@@ -14,6 +14,7 @@ using namespace std;
 
 // Sets up the heatmap
 void Ped::Model::setupHeatmapSeq() {
+  auto start_time = std::chrono::high_resolution_clock::now();
   int* hm = (int*)calloc(SIZE * SIZE, sizeof(int));
   int* shm = (int*)malloc(SCALED_SIZE * SCALED_SIZE * sizeof(int));
   int* bhm = (int*)malloc(SCALED_SIZE * SCALED_SIZE * sizeof(int));
@@ -30,10 +31,14 @@ void Ped::Model::setupHeatmapSeq() {
     scaled_heatmap[i] = shm + SCALED_SIZE * i;
     blurred_heatmap[i] = bhm + SCALED_SIZE * i;
   }
+  seq_heatmap_creation_time += std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::high_resolution_clock::now() - start_time).count();
 }
+
 
 // Updates the heatmap according to the agent positions
 void Ped::Model::updateHeatmapSeq() {
+  auto start_time = std::chrono::high_resolution_clock::now();
   for (int x = 0; x < SIZE; x++) {
     for (int y = 0; y < SIZE; y++) {
       // heat fades
@@ -60,7 +65,9 @@ void Ped::Model::updateHeatmapSeq() {
       heatmap[y][x] = heatmap[y][x] < 255 ? heatmap[y][x] : 255;
     }
   }
-
+  seq_heatmap_creation_tick_time += std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::high_resolution_clock::now() - start_time).count();
+  start_time = std::chrono::high_resolution_clock::now();
   // Scale the data for visual representation
   for (int y = 0; y < SIZE; y++) {
     for (int x = 0; x < SIZE; x++) {
@@ -72,7 +79,10 @@ void Ped::Model::updateHeatmapSeq() {
       }
     }
   }
+  seq_heatmap_scaling_time += std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::high_resolution_clock::now() - start_time).count();
 
+  start_time = std::chrono::high_resolution_clock::now();
   // Weights for blur filter
   const int w[5][5] = {{1, 4, 7, 4, 1},
                        {4, 16, 26, 16, 4},
@@ -94,6 +104,8 @@ void Ped::Model::updateHeatmapSeq() {
       blurred_heatmap[i][j] = 0x00FF0000 | value << 24;
     }
   }
+  seq_heatmap_blurring_time += std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::high_resolution_clock::now() - start_time).count();
 }
 
 int Ped::Model::getHeatmapSize() const { return SCALED_SIZE; }

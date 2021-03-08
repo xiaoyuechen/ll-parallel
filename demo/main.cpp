@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     MainWindow mainwindow(model);
 
     // Default number of steps to simulate. Feel free to change this.
-    const int maxNumberOfStepsToSimulate = 100000;
+    const int maxNumberOfStepsToSimulate = 100;
 
     // Timing version
     // Run twice, without the gui, to compare the runtimes.
@@ -113,33 +113,45 @@ int main(int argc, char* argv[]) {
                 std::chrono::steady_clock::now() - start);
         fps_seq = ((float)simulation.getTickCount()) /
                   ((float)duration_seq.count()) * 1000.0;
-        cout << "Reference time: " << duration_seq.count() << " milliseconds, "
+        cout << "Reference time: " << duration_seq.count() << " milliseconds,"
              << fps_seq << " Frames Per Second." << std::endl;
+        printf("SEQ heatmap creation time: %f\n", model.seq_heatmap_creation_time + 
+                                                  model.seq_heatmap_creation_tick_time);
+        printf("SEQ heatmap scaling time: %f\n", model.seq_heatmap_scaling_time);
+        printf("SEQ heatmap blurring time: %f\n", model.seq_heatmap_blurring_time);
       }
 
       // Change this variable when testing different versions of your code.
       // May need modification or extension in later assignments depending on
       // your implementations
-      Ped::IMPLEMENTATION implementation_to_test = impl;
-      {
-        Ped::Model model;
-        ParseScenario parser(scenefile);
-        model.setup(parser.getAgents(), parser.getWaypoints(),
-                    implementation_to_test);
-        PedSimulation simulation(model, mainwindow);
-        // Simulation mode to use when profiling (without any GUI)
-        std::cout << "Running target version...\n";
-        auto start = std::chrono::steady_clock::now();
-        simulation.runSimulationWithoutQt(maxNumberOfStepsToSimulate);
-        auto duration_target =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - start);
-        fps_target = ((float)simulation.getTickCount()) /
-                     ((float)duration_target.count()) * 1000.0;
-        cout << "Target time: " << duration_target.count() << " milliseconds, "
-             << fps_target << " Frames Per Second." << std::endl;
-      }
-      std::cout << "\n\nSpeedup: " << fps_target / fps_seq << std::endl;
+      // Ped::IMPLEMENTATION implementation_to_test = impl;
+      // {
+      //   Ped::Model model;
+      //   ParseScenario parser(scenefile);
+      //   model.setup(parser.getAgents(), parser.getWaypoints(),
+      //               implementation_to_test);
+      //   PedSimulation simulation(model, mainwindow);
+      //   // Simulation mode to use when profiling (without any GUI)
+      //   std::cout << "Running target version...\n";
+      //   auto start = std::chrono::steady_clock::now();
+      //   simulation.runSimulationWithoutQt(maxNumberOfStepsToSimulate);
+      //   auto duration_target =
+      //       std::chrono::duration_cast<std::chrono::milliseconds>(
+      //           std::chrono::steady_clock::now() - start);
+      //   fps_target = ((float)simulation.getTickCount()) /
+      //                ((float)duration_target.count()) * 1000.0;
+      //   cout << "Target time: " << duration_target.count() << " milliseconds, "
+      //        << fps_target << " Frames Per Second." << std::endl;
+
+      //   if (impl == Ped::IMPLEMENTATION::REGION) {
+      //     printf("Heatmap creation time: %f\n", model.heatmap_creation_time);
+      //     printf("Heatmap scaling time: %f\n", model.heatmap_scaling_time);
+      //     printf("Heatmap blurring time: %f\n", model.heatmap_blurring_time);
+      //     printf("Imbalance: %f\n",
+      //            model.imbalance / simulation.getTickCount());
+      //   }
+      // }
+      // std::cout << "\n\nSpeedup: " << fps_target / fps_seq << std::endl;
 
     }
     // Graphics version
