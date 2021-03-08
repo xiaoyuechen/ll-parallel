@@ -12,9 +12,12 @@ namespace Ped {
 __constant__ int kWeightMatrix[5][5];
 
 
+int* h_hm;
+
 void Model::SetupHeatmapCuda() {
-  cudaMallocHost(&hm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
-  cudaMemset(hm, 0, SIZE * SIZE * sizeof(int));
+  cudaMallocHost(&h_hm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+  cudaMemset(h_hm, 0, SIZE * SIZE * sizeof(int));
+  cudaMalloc(&hm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
   cudaMalloc(&shm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
   cudaMalloc(&bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int));
   
@@ -121,6 +124,7 @@ void BlurHeatmapCPU(int* shm, int* bhm){
 }
 
 void CreateHeatmapCPU(int* heatmap, AgentSoa* agent_soa) {
+  # pragma omp parallel for
   for (int x = 0; x < SIZE; x++) {
     for (int y = 0; y < SIZE; y++) {
       // heat fades
@@ -128,6 +132,7 @@ void CreateHeatmapCPU(int* heatmap, AgentSoa* agent_soa) {
     }
   }
 
+  # pragma omp parallel for
   // Count how many agents want to go to each location
   for (int i = 0; i < agent_soa->size; i++) {
     int x = agent_soa->desired_xs[i];
@@ -137,10 +142,23 @@ void CreateHeatmapCPU(int* heatmap, AgentSoa* agent_soa) {
       continue;
     }
 
-    // intensify heat for better color results
+    #pragma omp atomic update
     heatmap[y * SIZE + x] += 40;
   }
 }
+
+void ScaleHeatmapCPU(int* hm, int* shm) {
+  #pragma omp parallel for
+  for (int y = 0; y < SIZE; y++) {
+    for (int x = 0; x < SIZE; x++) {
+    int val = hm[y * SIZE + x];
+    for(int cy = 0; cy < CELLSIZE; ++cy)
+      for(int cx = 0; cx < CELLSIZE; ++cx)
+        shm[(y * CELLSIZE + cy) * SCALED_SIZE + x * CELLSIZE + cx] = val;
+    }
+  }
+}
+
 
 std::uint32_t& cell(State& state, int x, int y) {
   return state.state[x + state.offset_x][y + state.offset_y];
@@ -178,15 +196,13 @@ void Model::tickRegion() {
   }
   //////// end of init ////////
   
+  auto tick_start = std::chrono::high_resolution_clock::now();
+
   cudaEvent_t start[3], stop[3];
   for(int i = 0; i != 3; ++i) {
     cudaEventCreate(&start[i]);
     cudaEventCreate(&stop[i]);
   }
-  
-  auto cpu_start = std::chrono::high_resolution_clock::now();
-
-  CreateHeatmapCPU(hm, agent_soa);
 
   // scale heatmap
   {
@@ -201,12 +217,15 @@ void Model::tickRegion() {
 
   // blur heatmap
   {
+    cudaEventRecord(start[2], 0);
     dim3 threads_per_block(32, 32);
     dim3 num_blocks(SCALED_SIZE / threads_per_block.x, SCALED_SIZE / threads_per_block.y);
     BlurHeatmap<<<num_blocks, threads_per_block>>>(shm, bhm, SCALED_SIZE);
     cudaEventRecord(stop[2], 0);
   }
 
+
+  /////// collision /////////
   ComputeDesiredPos();
   std::transform(agent_soa->desired_xs, agent_soa->desired_xs + agent_soa->size, 
     desired_xs, [](float x){return int(x);});
@@ -228,11 +247,14 @@ void Model::tickRegion() {
     move(begin, end);
   }
 
-  auto cpu_duration = std::chrono::duration_cast<std::chrono::microseconds>(
-    std::chrono::high_resolution_clock::now() - cpu_start);
-  float cpu_end = cpu_duration.count() / 1000;
+  // CPU heatmap
+  CreateHeatmapCPU(h_hm, agent_soa);
+  // ScaleHeatmapCPU(hm, h_shm);
 
-  cudaMemcpy(h_bhm, bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
+  // timing
+  auto cpu_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::high_resolution_clock::now() - tick_start);
+  float cpu_end = cpu_duration.count() / 1000;
 
   cudaEventSynchronize(stop[2]);
   float* times[] = {&heatmap_creation_time, &heatmap_scaling_time, &heatmap_blurring_time};
@@ -241,11 +263,19 @@ void Model::tickRegion() {
     cudaEventElapsedTime(&duration, start[i], stop[i]);
     *times[i] += duration;
   }
+  
+  float gpu_duration;
+  cudaEventElapsedTime(&gpu_duration, start[0], stop[2]);
+  float gpu_end = gpu_duration;
+  
+  imbalance += (gpu_end - cpu_end) / gpu_end;
 
-  float gpu_end;
-  cudaEventElapsedTime(&gpu_end, start[1], stop[2]);
-
-  imbalance += (cpu_end - gpu_end) / cpu_end;
+  cudaStream_t streams[2];
+  for (int i = 0; i < 2; i++)
+    cudaStreamCreate(&streams[i]);
+  cudaMemcpyAsync(h_bhm, bhm, SCALED_SIZE * SCALED_SIZE * sizeof(int), cudaMemcpyDeviceToHost, streams[0]);
+  cudaMemcpyAsync(hm, h_hm, SIZE * SIZE * sizeof(int), cudaMemcpyHostToDevice, streams[1]);
+  cudaDeviceSynchronize();
 }
 
 }  // namespace Ped
