@@ -34,6 +34,7 @@ void Ped::Model::setupHeatmapSeq() {
 
 // Updates the heatmap according to the agent positions
 void Ped::Model::updateHeatmapSeq() {
+  auto create_start = std::chrono::high_resolution_clock::now();
   for (int x = 0; x < SIZE; x++) {
     for (int y = 0; y < SIZE; y++) {
       // heat fades
@@ -61,6 +62,7 @@ void Ped::Model::updateHeatmapSeq() {
     }
   }
 
+  auto scale_start = std::chrono::high_resolution_clock::now();
   // Scale the data for visual representation
   for (int y = 0; y < SIZE; y++) {
     for (int x = 0; x < SIZE; x++) {
@@ -73,6 +75,7 @@ void Ped::Model::updateHeatmapSeq() {
     }
   }
 
+  auto blur_start = std::chrono::high_resolution_clock::now();
   // Weights for blur filter
   const int w[5][5] = {{1, 4, 7, 4, 1},
                        {4, 16, 26, 16, 4},
@@ -94,6 +97,21 @@ void Ped::Model::updateHeatmapSeq() {
       blurred_heatmap[i][j] = 0x00FF0000 | value << 24;
     }
   }
+  auto end = std::chrono::high_resolution_clock::now();
+
+  heatmap_creation_time +=
+      std::chrono::duration_cast<std::chrono::microseconds>(scale_start -
+                                                            create_start)
+          .count() /
+      1000;
+  heatmap_scaling_time += std::chrono::duration_cast<std::chrono::microseconds>(
+                              blur_start - scale_start)
+                              .count() /
+                          1000;
+  heatmap_blurring_time +=
+      std::chrono::duration_cast<std::chrono::microseconds>(end - blur_start)
+          .count() /
+      1000;
 }
 
 int Ped::Model::getHeatmapSize() const { return SCALED_SIZE; }

@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     MainWindow mainwindow(model);
 
     // Default number of steps to simulate. Feel free to change this.
-    const int maxNumberOfStepsToSimulate = 1000;
+    const int maxNumberOfStepsToSimulate = 100;
 
     // Timing version
     // Run twice, without the gui, to compare the runtimes.
@@ -140,13 +140,10 @@ int main(int argc, char* argv[]) {
         cout << "Target time: " << duration_target.count() << " milliseconds, "
              << fps_target << " Frames Per Second." << std::endl;
 
-        if (impl == Ped::IMPLEMENTATION::REGION) {
-          printf("Heatmap creation time: %f\n", model.heatmap_creation_time);
-          printf("Heatmap scaling time: %f\n", model.heatmap_scaling_time);
-          printf("Heatmap blurring time: %f\n", model.heatmap_blurring_time);
-          printf("Imbalance: %f\n",
-                 model.imbalance / simulation.getTickCount());
-        }
+        printf("Heatmap creation time: %f\n", model.heatmap_creation_time);
+        printf("Heatmap scaling time: %f\n", model.heatmap_scaling_time);
+        printf("Heatmap blurring time: %f\n", model.heatmap_blurring_time);
+        printf("Imbalance: %f\n", model.imbalance / simulation.getTickCount());
       }
       std::cout << "\n\nSpeedup: " << fps_target / fps_seq << std::endl;
 
